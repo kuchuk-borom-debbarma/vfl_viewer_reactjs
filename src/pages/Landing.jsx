@@ -6,7 +6,19 @@ import "../styles/layout.css";
 import "../styles/components.css";
 import "../styles/typography.css";
 
-export default function Landing() {
+// 1. Define FeatureCard FIRST
+function FeatureCard({ title, icon, desc }) {
+  return (
+      <div className="card">
+        <div className="card-icon">{icon}</div>
+        <div className="card-title">{title}</div>
+        <div className="card-desc">{desc}</div>
+      </div>
+  );
+}
+
+// 2. Then define the Landing component
+export default function Landing({ onShowOperations }) {
   return (
       <div className="page">
         {/* Header */}
@@ -27,7 +39,9 @@ export default function Landing() {
               logging framework built for modern distributed systems developed by Kuchuk Boram Debbarma.
             </p>
             <div className="hero-actions">
-              <button className="btn btn-primary">Show Operations</button>
+              <button className="btn btn-primary" onClick={onShowOperations}>
+                Show Operations
+              </button>
               <button className="btn btn-outline">Documentation</button>
             </div>
           </div>
@@ -59,17 +73,6 @@ export default function Landing() {
         <footer className="footer">
           &copy; {new Date().getFullYear()} VFL — Hierarchical Logging Framework
         </footer>
-      </div>
-  );
-}
-
-// FeatureCard Component
-function FeatureCard({ title, icon, desc }) {
-  return (
-      <div className="card">
-        <div className="card-icon">{icon}</div>
-        <div className="card-title">{title}</div>
-        <div className="card-desc">{desc}</div>
       </div>
   );
 }

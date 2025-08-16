@@ -1,4 +1,4 @@
-import { getApiUrl, CONFIG } from "../config/config";
+import {CONFIG, getApiUrl} from "../config/config";
 
 export interface Block {
     id: string;
@@ -29,12 +29,13 @@ export async function getRootBlocks(
     limit: number = CONFIG.DEFAULT_PAGE_SIZE,
     cursor?: string
 ): Promise<Block[]> {
-    const params = new URLSearchParams({ limit: limit.toString() });
+    const params = new URLSearchParams({limit: limit.toString()});
     if (cursor) {
         params.append("cursor", cursor);
     }
-
-    const res = await fetch(getApiUrl(`/root-blocks?${params.toString()}`));
+    const url = getApiUrl(`/root-blocks?${params.toString()}`);
+    const res = await fetch(url);
+    console.log(url)
     if (!res.ok) {
         throw new Error(`Failed to fetch blocks: ${res.statusText}`);
     }

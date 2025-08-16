@@ -2,8 +2,7 @@
 
 import {createRoot} from 'react-dom/client';
 import './index.css';
-import Landing from "./pages/Landing.jsx";
-
+import {App} from "./App.js"
 createRoot(document.getElementById('root')).render(
-    <Landing/>
+    <App/>
 );

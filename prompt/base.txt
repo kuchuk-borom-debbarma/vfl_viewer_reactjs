@@ -1,0 +1,6 @@
+Style should be minimal modern sleek.
+Always re-use components, styles.
+Always try to create re-usable component,  styles.
+NEVER use tailwind or other css framework. rely purely on raw css created manually
+Use existing pages and try to fit the theme.
+Make sure it's responsive
