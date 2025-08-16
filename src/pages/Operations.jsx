@@ -1,14 +1,12 @@
-// src/pages/Operations.jsx
-
 import React, {useEffect, useState} from "react";
 import "../styles/variable.css";
 import "../styles/base.css";
 import "../styles/layout.css";
 import "../styles/components.css";
 import "../styles/typography.css";
-import {getRootBlocks} from "../api/vfl";
+import { getRootBlocks } from "../api/vfl";
 
-function BlockCard({block}) {
+function BlockCard({ block }) {
   return (
       <div className="card">
         <div className="card-title">{block.name}</div>
@@ -23,28 +21,19 @@ function BlockCard({block}) {
   );
 }
 
-export default function Operations({goBack}) {
+export default function Operations({ goBack }) {
   const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [nextCursor, setNextCursor] = useState(undefined);
+  const [reachedEnd, setReachedEnd] = useState(false);
 
-  // Safely pick the next cursor (latest createdAt, tie-break by id)
-  const getNextCursor = () => {
-    if (blocks.length === 0) return undefined;
-    const lastBlock = blocks.reduce((a, b) => {
-      if (a.createdAt !== b.createdAt) {
-        return a.createdAt > b.createdAt ? a : b;
-      }
-      return a.id > b.id ? a : b;
-    });
-    return lastBlock.cursor;
-  };
+  // PAGE_SIZE: use config if you want, here hardcoded for demo
+  const PAGE_SIZE = 1;
 
-  // Fetch blocks from API
   const fetchBlocks = async (cursor, append = false) => {
     setLoading(true);
     try {
-      const res = await getRootBlocks(2, cursor);  // pass page size + optional cursor
+      const res = await getRootBlocks(PAGE_SIZE, cursor);
       if (append) {
         setBlocks(prev => {
           const seen = new Set(prev.map(b => b.id));
@@ -54,25 +43,28 @@ export default function Operations({goBack}) {
       } else {
         setBlocks(res);
       }
-      setHasMore(res.length === 10);
+
+      if (res.length > 0) {
+        setNextCursor(res[res.length - 1].cursor);
+        setReachedEnd(res.length < PAGE_SIZE); // if fewer than requested, probably last page
+      } else {
+        setReachedEnd(true); // No results, definitely at end
+      }
     } catch (err) {
-      console.error(err);
-      if (!append) setBlocks([]);
-      setHasMore(false);
+      // Show a friendly message -- don't crash the app!
+      setReachedEnd(true);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Load initial page
     fetchBlocks(undefined, false);
   }, []);
 
   const handleLoadMore = () => {
-    const cursor = getNextCursor();
-    if (!cursor) return;
-    fetchBlocks(cursor, true);
+    if (reachedEnd || loading) return;
+    fetchBlocks(nextCursor, true);
   };
 
   return (
@@ -98,9 +90,17 @@ export default function Operations({goBack}) {
           )}
         </div>
 
-        {hasMore && (
+        {reachedEnd ? (
+            <div style={{textAlign: "center", margin: "24px 0", color: "var(--color-text-light)"}}>
+              No more results.
+            </div>
+        ) : (
             <div style={{display: "flex", justifyContent: "center", marginTop: "24px"}}>
-              <button className="btn btn-outline" onClick={handleLoadMore} disabled={loading}>
+              <button
+                  className="btn btn-outline"
+                  onClick={handleLoadMore}
+                  disabled={loading}
+              >
                 {loading ? "Loading..." : "Load More"}
               </button>
             </div>
