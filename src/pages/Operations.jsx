@@ -23,44 +23,41 @@ function BlockCard({block}) {
   );
 }
 
-function Pagination({onPrev, onNext, disablePrev, disableNext, loading}) {
-  return (
-      <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: "24px",
-            marginTop: "32px",
-            marginBottom: "32px",
-          }}
-      >
-        <button className="btn btn-outline" disabled={disablePrev || loading} onClick={onPrev}>
-          Prev
-        </button>
-        <button className="btn btn-outline" disabled={disableNext || loading} onClick={onNext}>
-          Next
-        </button>
-      </div>
-  );
-}
-
 export default function Operations({goBack}) {
   const [blocks, setBlocks] = useState([]);
-  const [cursorStack, setCursorStack] = useState([undefined]); // track previous cursors for Prev button
   const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
 
-  // Current cursor is last in cursorStack
-  const currentCursor = cursorStack[cursorStack.length - 1];
+  // Safely pick the next cursor (latest createdAt, tie-break by id)
+  const getNextCursor = () => {
+    if (blocks.length === 0) return undefined;
+    const lastBlock = blocks.reduce((a, b) => {
+      if (a.createdAt !== b.createdAt) {
+        return a.createdAt > b.createdAt ? a : b;
+      }
+      return a.id > b.id ? a : b;
+    });
+    return lastBlock.cursor;
+  };
 
-  const fetchBlocks = async (cursor) => {
+  // Fetch blocks from API
+  const fetchBlocks = async (cursor, append = false) => {
     setLoading(true);
     try {
-      const res = await getRootBlocks(cursor);
-      setBlocks(res);
-      setHasMore(res.length === 10); // assume more if got max page size
-    } catch {
-      setBlocks([]);
+      const res = await getRootBlocks(2, cursor);  // pass page size + optional cursor
+      if (append) {
+        setBlocks(prev => {
+          const seen = new Set(prev.map(b => b.id));
+          const deduped = res.filter(b => !seen.has(b.id));
+          return [...prev, ...deduped];
+        });
+      } else {
+        setBlocks(res);
+      }
+      setHasMore(res.length === 10);
+    } catch (err) {
+      console.error(err);
+      if (!append) setBlocks([]);
       setHasMore(false);
     } finally {
       setLoading(false);
@@ -68,19 +65,14 @@ export default function Operations({goBack}) {
   };
 
   useEffect(() => {
-    fetchBlocks(currentCursor);
-  }, [currentCursor]);
+    // Load initial page
+    fetchBlocks(undefined, false);
+  }, []);
 
-  const handleNext = () => {
-    if (blocks.length === 0) return;
-    const lastBlock = blocks[blocks.length - 1];
-    if (!lastBlock.cursor) return;
-    setCursorStack((prev) => [...prev, lastBlock.cursor]);
-  };
-
-  const handlePrev = () => {
-    if (cursorStack.length <= 1) return;
-    setCursorStack((prev) => prev.slice(0, prev.length - 1));
+  const handleLoadMore = () => {
+    const cursor = getNextCursor();
+    if (!cursor) return;
+    fetchBlocks(cursor, true);
   };
 
   return (
@@ -91,6 +83,7 @@ export default function Operations({goBack}) {
             </button>
         )}
         <h2 className="section-title">Operations</h2>
+
         <div className="features-grid" style={{minHeight: "300px"}}>
           {loading && blocks.length === 0 ? (
               <div style={{gridColumn: "1/-1", textAlign: "center", color: "var(--color-text-light)"}}>
@@ -101,17 +94,17 @@ export default function Operations({goBack}) {
                 No blocks found.
               </div>
           ) : (
-              blocks.map((block) => <BlockCard key={block.id} block={block}/>)
+              blocks.map(block => <BlockCard key={block.id} block={block} />)
           )}
         </div>
 
-        <Pagination
-            onPrev={handlePrev}
-            onNext={handleNext}
-            disablePrev={cursorStack.length <= 1}
-            disableNext={!hasMore}
-            loading={loading}
-        />
+        {hasMore && (
+            <div style={{display: "flex", justifyContent: "center", marginTop: "24px"}}>
+              <button className="btn btn-outline" onClick={handleLoadMore} disabled={loading}>
+                {loading ? "Loading..." : "Load More"}
+              </button>
+            </div>
+        )}
       </div>
   );
 }
