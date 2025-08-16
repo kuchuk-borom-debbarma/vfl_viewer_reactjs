@@ -22,13 +22,21 @@ export interface LogEntry {
     children: LogEntry[];
 }
 
+// src/api/vfl.ts
+
 async function apiFetch<T>(endpoint: string): Promise<T> {
-    const res = await fetch(getApiUrl(endpoint));
+    const url = getApiUrl(endpoint);
+    console.debug("[API Fetch] GET", url); // ✅ Debug log
+    const res = await fetch(url);
+
     if (!res.ok) {
+        console.error("[API Error]", res.status, res.statusText, "URL:", url);
         throw new Error(`API error: ${res.statusText}`);
     }
+
     return res.json();
 }
+
 
 export async function getRootBlocks(
     limit: number = CONFIG.DEFAULT_PAGE_SIZE,
@@ -45,11 +53,17 @@ export async function getLogsByBlockId(
     maxChildren: number,
     cursor?: string
 ): Promise<LogEntry[]> {
+    console.debug("[getLogsByBlockId] b lockId:", blockId,
+        "maxDepth:", maxDepth,
+        "maxChildren:", maxChildren,
+        "cursor:", cursor);
+
     const params = new URLSearchParams({
         blockId,
         maxDepth: maxDepth.toString(),
         maxChildren: maxChildren.toString(),
     });
     if (cursor) params.append("cursor", cursor);
+
     return apiFetch<LogEntry[]>(`/logs-by-blockid?${params.toString()}`);
 }

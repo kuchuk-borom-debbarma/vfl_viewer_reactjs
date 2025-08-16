@@ -1,9 +1,17 @@
+// src/pages/Operations.tsx
+// @ts-ignore
 import React, { useEffect, useState } from "react";
 import { CONFIG } from "../config/config";
 import { getRootBlocks, Block } from "../api/vfl";
-import BlockCard from "../components/BlockCard";  // ✅ new import
+import BlockCard from "../components/BlockCard";
 
-export default function Operations({ goBack }: { goBack: () => void }) {
+export default function Operations({
+                                     goBack,
+                                     onViewLogs,
+                                   }: {
+  goBack: () => void;
+  onViewLogs: (blockId: string) => void;   // ✅ new prop
+}) {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [loading, setLoading] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
@@ -66,7 +74,15 @@ export default function Operations({ goBack }: { goBack: () => void }) {
           ) : blocks.length === 0 ? (
               <div className="grid-full text-center muted">No blocks found.</div>
           ) : (
-              blocks.map((block) => <BlockCard key={block.id} block={block} />)
+              blocks.map((block) => (
+                  <div
+                      key={block.id}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => onViewLogs(block.id)} // ✅ navigate to Logs
+                  >
+                    <BlockCard block={block} />
+                  </div>
+              ))
           )}
         </div>
 

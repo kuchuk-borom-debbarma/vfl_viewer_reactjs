@@ -59,3 +59,29 @@
 .nav button:hover {
     color: var(--color-primary);
 }
+.log-item {
+    border-left: 2px solid var(--color-border);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: var(--color-surface);
+    border-radius: 6px;
+}
+
+.log-item:hover {
+    background: #f9fafb;
+}
+
+.log-message {
+    font-size: var(--text-md);
+    color: var(--color-text-dark);
+}
+
+.log-ref-block {
+    margin-top: 6px;
+}
+
+.log-children {
+    margin-top: 8px;
+    border-left: 1px dashed var(--color-border);
+    padding-left: 12px;
+}
