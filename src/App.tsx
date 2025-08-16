@@ -1,21 +1,23 @@
-// @ts-ignore
 import React, { useState } from "react";
-import { createRoot } from "react-dom/client";
-import Landing from "./pages/Landing.jsx";
-import Operations from "./pages/Operations.jsx";
+import Landing from "./pages/Landing";
+import Operations from "./pages/Operations";
 
 export function App() {
-    const [page, setPage] = useState("landing");
+    const PAGES = {
+        LANDING: "landing",
+        OPERATIONS: "operations",
+    } as const;
 
-    const goToOperations = () => setPage("operations");
-    const goToLanding = () => setPage("landing");
+    const [page, setPage] = useState<typeof PAGES[keyof typeof PAGES]>(
+        PAGES.LANDING
+    );
 
-    if (page === "operations") {
+    const goToOperations = () => setPage(PAGES.OPERATIONS);
+    const goToLanding = () => setPage(PAGES.LANDING);
+
+    if (page === PAGES.OPERATIONS) {
         return <Operations goBack={goToLanding} />;
     }
 
-    // Default to landing
     return <Landing onShowOperations={goToOperations} />;
 }
-
-createRoot(document.getElementById("root")).render(<App />);

@@ -22,3 +22,37 @@ a {
     text-decoration: none;
     color: inherit;
 }
+
+.section-padding {
+    padding-top: 48px;
+    padding-bottom: 48px;
+}
+
+.mb-lg {
+    margin-bottom: 24px;
+}
+
+.mt-lg {
+    margin-top: 24px;
+}
+
+.min-height-300 {
+    min-height: 300px;
+}
+
+.grid-full {
+    grid-column: 1/-1;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.muted {
+    color: var(--color-text-light);
+}
+
+.error {
+    color: red;
+}
+

@@ -1,4 +1,4 @@
-import {CONFIG, getApiUrl} from "../config/config";
+import { CONFIG, getApiUrl } from "../config/config";
 
 export interface Block {
     id: string;
@@ -22,32 +22,23 @@ export interface LogEntry {
     children: LogEntry[];
 }
 
-/**
- * Fetch a list of root blocks, with optional pagination cursor.
- */
+async function apiFetch<T>(endpoint: string): Promise<T> {
+    const res = await fetch(getApiUrl(endpoint));
+    if (!res.ok) {
+        throw new Error(`API error: ${res.statusText}`);
+    }
+    return res.json();
+}
+
 export async function getRootBlocks(
     limit: number = CONFIG.DEFAULT_PAGE_SIZE,
     cursor?: string
 ): Promise<Block[]> {
-    const params = new URLSearchParams({limit: limit.toString()});
-    if (cursor) {
-        params.append("cursor", cursor);
-    }
-    const url = getApiUrl(`/root-blocks?${params.toString()}`);
-    const res = await fetch(url);
-    console.log(url)
-    if (!res.ok) {
-        throw new Error(`Failed to fetch blocks: ${res.statusText}`);
-    }
-
-    return res.json();
+    const params = new URLSearchParams({ limit: limit.toString() });
+    if (cursor) params.append("cursor", cursor);
+    return apiFetch<Block[]>(`/root-blocks?${params.toString()}`);
 }
 
-/**
- * Fetch logs of a block from root (no cursor) or sibling logs using cursor.
- * - If cursor is not provided, starts from the root logs of the block.
- * - If cursor is provided, fetches the next sibling logs of the same depth.
- */
 export async function getLogsByBlockId(
     blockId: string,
     maxDepth: number,
@@ -59,15 +50,6 @@ export async function getLogsByBlockId(
         maxDepth: maxDepth.toString(),
         maxChildren: maxChildren.toString(),
     });
-
-    if (cursor) {
-        params.append("cursor", cursor);
-    }
-
-    const res = await fetch(getApiUrl(`/logs-by-blockid?${params.toString()}`));
-    if (!res.ok) {
-        throw new Error(`Failed to fetch logs: ${res.statusText}`);
-    }
-
-    return res.json();
+    if (cursor) params.append("cursor", cursor);
+    return apiFetch<LogEntry[]>(`/logs-by-blockid?${params.toString()}`);
 }

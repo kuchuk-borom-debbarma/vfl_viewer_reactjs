@@ -1,13 +1,6 @@
-// src/pages/Landing.jsx
 import React from "react";
-import "../styles/variable.css";
-import "../styles/base.css";
-import "../styles/layout.css";
-import "../styles/components.css";
-import "../styles/typography.css";
 
-// 1. Define FeatureCard FIRST
-function FeatureCard({ title, icon, desc }) {
+function FeatureCard({ title, icon, desc }: { title: string; icon: string; desc: string }) {
   return (
       <div className="card">
         <div className="card-icon">{icon}</div>
@@ -17,15 +10,18 @@ function FeatureCard({ title, icon, desc }) {
   );
 }
 
-// 2. Then define the Landing component
-export default function Landing({ onShowOperations }) {
+export default function Landing({
+                                  onShowOperations,
+                                }: {
+  onShowOperations: () => void;
+}) {
   return (
       <div className="page">
         {/* Header */}
         <header className="header">
           <div className="logo">VFL</div>
           <nav className="nav">
-            <button>About Kuchuk Boram Debbarma</button>
+            <button>About</button>
             <button>Documentation</button>
           </nav>
         </header>
@@ -36,7 +32,7 @@ export default function Landing({ onShowOperations }) {
             <h1 className="hero-title">Hierarchical Logging Reinvented</h1>
             <p className="hero-subtitle">
               <span className="highlight">VFL</span> is a minimal, blazing-fast
-              logging framework built for modern distributed systems developed by Kuchuk Boram Debbarma.
+              logging framework built for modern distributed systems.
             </p>
             <div className="hero-actions">
               <button className="btn btn-primary" onClick={onShowOperations}>
@@ -71,7 +67,7 @@ export default function Landing({ onShowOperations }) {
 
         {/* Footer */}
         <footer className="footer">
-          &copy; {new Date().getFullYear()} VFL — Hierarchical Logging Framework
+          © {new Date().getFullYear()} VFL — Hierarchical Logging Framework
         </footer>
       </div>
   );
