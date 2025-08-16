@@ -1,21 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CONFIG } from "../config/config";
 import { getRootBlocks, Block } from "../api/vfl";
-
-function BlockCard({ block }: { block: Block }) {
-  return (
-      <div className="card">
-        <div className="card-title">{block.name}</div>
-        <div className="card-desc" style={{ whiteSpace: "pre-line" }}>
-          ID: {block.id}
-          {"\n"}
-          Started: {new Date(block.startTime).toLocaleString()}
-          {"\n"}
-          Ended: {block.endTime ? new Date(block.endTime).toLocaleString() : "Ongoing"}
-        </div>
-      </div>
-  );
-}
+import BlockCard from "../components/BlockCard";  // ✅ new import
 
 export default function Operations({ goBack }: { goBack: () => void }) {
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -88,7 +74,11 @@ export default function Operations({ goBack }: { goBack: () => void }) {
             <div className="text-center muted mt-lg">No more results.</div>
         ) : (
             <div className="flex-center mt-lg">
-              <button className="btn btn-outline" onClick={handleLoadMore} disabled={loading}>
+              <button
+                  className="btn btn-outline"
+                  onClick={handleLoadMore}
+                  disabled={loading}
+              >
                 {loading ? "Loading..." : "Load More"}
               </button>
             </div>
