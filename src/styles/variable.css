@@ -1,0 +1,25 @@
+:root {
+    /* Colors */
+    --color-primary: #2563eb; /* blue-600 */
+    --color-primary-dark: #1e40af;
+    --color-background: #f9fafb;
+    --color-surface: #ffffff;
+    --color-text-dark: #111827;
+    --color-text-light: #6b7280;
+    --color-border: #e5e7eb;
+
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 48px;
+
+    /* Typography */
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --text-sm: 14px;
+    --text-md: 16px;
+    --text-lg: 20px;
+    --text-xl: 30px;
+    --text-2xl: 42px;
+}
