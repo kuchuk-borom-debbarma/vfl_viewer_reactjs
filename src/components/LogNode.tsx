@@ -17,7 +17,7 @@ const formatTime = (timestamp) => {
     return date.toLocaleTimeString();
 };
 
-const LogNode = ({ data, isConnectable = true }) => {
+const LogNode = ({ data, isConnectable = true, onLoadMoreChildren, onLoadMoreSiblings }) => {
     const logEntry = data.logEntry || data;
 
     if (!logEntry) {
@@ -41,13 +41,15 @@ const LogNode = ({ data, isConnectable = true }) => {
     const showSiblingArrow = logEntry.siblingCursor !== null;
 
     const handleChildrenPagination = () => {
-        // Handle children pagination logic here
-        console.log('Load more children for:', logEntry.id, 'cursor:', logEntry.childrenCursor);
+        if (onLoadMoreChildren && logEntry.childrenCursor) {
+            onLoadMoreChildren(logEntry.childrenCursor);
+        }
     };
 
     const handleSiblingPagination = () => {
-        // Handle sibling pagination logic here
-        console.log('Load more siblings for:', logEntry.id, 'cursor:', logEntry.siblingCursor);
+        if (onLoadMoreSiblings && logEntry.siblingCursor) {
+            onLoadMoreSiblings(logEntry.siblingCursor);
+        }
     };
 
     return (
