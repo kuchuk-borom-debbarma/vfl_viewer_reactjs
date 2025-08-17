@@ -1,4 +1,4 @@
-// src/pages/LogsPage.tsx - Optimized ReactFlow Implementation
+// src/pages/LogsPage.tsx - Smart Child Expansion Implementation
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     addEdge, Background, Connection, Controls, Edge, Handle, MarkerType,
@@ -32,7 +32,7 @@ const getNodeId = (log: LogEntry): string => log.parentLogId === null ? "ROOT" :
 
 // Custom Node Component
 const LogNode = ({ data }: { data: any }) => {
-    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading } = data;
+    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading, isLatestInBranch } = data;
 
     return (
         <>
@@ -63,7 +63,8 @@ const LogNode = ({ data }: { data: any }) => {
                 </div>
 
                 <div style={{ position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px' }}>
-                    {canExpandChildren && (
+                    {/* Only show expand children button if this is the latest node in its branch AND can expand */}
+                    {canExpandChildren && isLatestInBranch && (
                         <button onClick={(e) => { e.stopPropagation(); onExpand('children'); }}
                                 disabled={isLoading} style={{
                             width: '20px', height: '20px', borderRadius: '50%', border: 'none',
@@ -114,6 +115,36 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
         canLoadMoreSiblings: true, isLoading: false,
     });
 
+    // Function to determine if a node is the latest in its branch
+    const isLatestInBranch = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
+        // If this node has children, it's not a leaf node
+        if (node.children.length > 0) {
+            return false;
+        }
+
+        // Check if there are any other nodes with the same parent that are newer
+        const siblings = Array.from(allNodes.values()).filter(n =>
+            n.parent?.id === node.parent?.id && n.id !== node.id
+        );
+
+        // If no siblings, this is the latest
+        if (siblings.length === 0) {
+            return true;
+        }
+
+        // Compare timestamps and IDs to determine if this is the latest
+        const isLatest = siblings.every(sibling => {
+            // First compare by timestamp
+            if (node.log.timestamp !== sibling.log.timestamp) {
+                return node.log.timestamp > sibling.log.timestamp;
+            }
+            // If timestamps are equal, compare by ID (lexicographically)
+            return node.log.id > sibling.log.id;
+        });
+
+        return isLatest;
+    };
+
     const buildNodesAndEdges = (graphNodes: Map<string, GraphNode>) => {
         const reactFlowNodes: Node[] = [], reactFlowEdges: Edge[] = [];
         const processedNodes = new Set<string>();
@@ -127,6 +158,9 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             if (processedNodes.has(nodeId)) return;
             processedNodes.add(nodeId);
 
+            // Determine if this node is the latest in its branch
+            const isLatest = isLatestInBranch(node, graphNodes);
+
             reactFlowNodes.push({
                 id: nodeId, type: 'logNode', position: { x, y },
                 data: {
@@ -136,6 +170,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                     canExpandChildren: node.canLoadMoreChildren,
                     canExpandSiblings: node.canLoadMoreSiblings,
                     isLoading: node.isLoading,
+                    isLatestInBranch: isLatest, // Pass this information to the node
                 },
             });
 
