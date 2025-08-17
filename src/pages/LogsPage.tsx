@@ -79,7 +79,7 @@ const LogNode = ({ data }: { data: any }) => {
                             background: '#16a34a', color: 'white', fontSize: '10px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }} title="Expand siblings">
-                            {isLoading ? '⏳' : '←'}
+                            {isLoading ? '⏳' : '→'}
                         </button>
                     )}
                 </div>
@@ -113,19 +113,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
         canLoadMoreSiblings: !!log.siblingCursor, isLoading: false,
     });
 
-    const isLatestInBranch = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
-        if (node.children.length > 0) return false;
-        const siblings = Array.from(allNodes.values()).filter(n =>
-            n.parent?.id === node.parent?.id && n.id !== node.id
-        );
-        if (siblings.length === 0) return true;
-        return siblings.every(sibling => {
-            if (node.log.timestamp !== sibling.log.timestamp) {
-                return node.log.timestamp > sibling.log.timestamp;
-            }
-            return node.log.id > sibling.log.id;
-        });
-    };
+    const isLatestInBranch = (node: GraphNode): boolean => node.children.length === 0;
 
     const buildNodesAndEdges = (graphNodes: Map<string, GraphNode>) => {
         const reactFlowNodes: Node[] = [], reactFlowEdges: Edge[] = [];
@@ -140,7 +128,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             if (processedNodes.has(nodeId)) return;
             processedNodes.add(nodeId);
 
-            const isLatest = isLatestInBranch(node, graphNodes);
+            const isLatest = isLatestInBranch(node);
 
             reactFlowNodes.push({
                 id: nodeId, type: 'logNode', position: { x, y },
