@@ -62,7 +62,6 @@ const LogNode = ({ data }: { data: any }) => {
                 </div>
 
                 <div style={{ position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px' }}>
-                    {/* Only show expand children button if this is the latest node in its branch AND can expand */}
                     {canExpandChildren && isLatestInBranch && (
                         <button onClick={(e) => { e.stopPropagation(); onExpand('children'); }}
                                 disabled={isLoading} style={{
@@ -80,7 +79,7 @@ const LogNode = ({ data }: { data: any }) => {
                             background: '#16a34a', color: 'white', fontSize: '10px', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }} title="Expand siblings">
-                            {isLoading ? '⏳' : '→'}
+                            {isLoading ? '⏳' : '←'}
                         </button>
                     )}
                 </div>
@@ -111,37 +110,21 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     const createGraphNode = (log: LogEntry, parent: GraphNode | null = null): GraphNode => ({
         id: log.id, log, children: [], parent, expanded: false,
         canLoadMoreChildren: !!log.childrenCursor || (log.children && log.children.length > 0),
-        canLoadMoreSiblings: true, isLoading: false,
+        canLoadMoreSiblings: !!log.siblingCursor, isLoading: false,
     });
 
-    // Function to determine if a node is the latest in its branch
     const isLatestInBranch = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
-        // If this node has children, it's not a leaf node
-        if (node.children.length > 0) {
-            return false;
-        }
-
-        // Check if there are any other nodes with the same parent that are newer
+        if (node.children.length > 0) return false;
         const siblings = Array.from(allNodes.values()).filter(n =>
             n.parent?.id === node.parent?.id && n.id !== node.id
         );
-
-        // If no siblings, this is the latest
-        if (siblings.length === 0) {
-            return true;
-        }
-
-        // Compare timestamps and IDs to determine if this is the latest
-        const isLatest = siblings.every(sibling => {
-            // First compare by timestamp
+        if (siblings.length === 0) return true;
+        return siblings.every(sibling => {
             if (node.log.timestamp !== sibling.log.timestamp) {
                 return node.log.timestamp > sibling.log.timestamp;
             }
-            // If timestamps are equal, compare by ID (lexicographically)
             return node.log.id > sibling.log.id;
         });
-
-        return isLatest;
     };
 
     const buildNodesAndEdges = (graphNodes: Map<string, GraphNode>) => {
@@ -157,7 +140,6 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             if (processedNodes.has(nodeId)) return;
             processedNodes.add(nodeId);
 
-            // Determine if this node is the latest in its branch
             const isLatest = isLatestInBranch(node, graphNodes);
 
             reactFlowNodes.push({
@@ -169,7 +151,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                     canExpandChildren: node.canLoadMoreChildren,
                     canExpandSiblings: node.canLoadMoreSiblings,
                     isLoading: node.isLoading,
-                    isLatestInBranch: isLatest, // Pass this information to the node
+                    isLatestInBranch: isLatest,
                 },
             });
 
@@ -213,10 +195,9 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
         const nodeMap = new Map<string, GraphNode>();
         const logById = new Map<string, LogEntry>();
 
-        // Index all logs with deduplication
         const indexLogs = (logs: LogEntry[]) => {
             logs.forEach(log => {
-                if (log.id && !logById.has(log.id)) { // ✅ Deduplication here
+                if (log.id && !logById.has(log.id)) {
                     logById.set(log.id, log);
                     if (log.children?.length) indexLogs(log.children);
                 }
@@ -246,7 +227,6 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     const handleExpand = async (node: GraphNode, type: 'children' | 'siblings') => {
         if (node.isLoading) return;
 
-        // Set loading state
         setGraphNodes(prev => {
             const updated = new Map(prev);
             const nodeToUpdate = updated.get(getNodeId(node.log));
@@ -265,7 +245,6 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                         const parentNode = updatedNodes.get(parentNodeId);
 
                         if (parentNode) {
-                            // ✅ Deduplication when adding new children
                             const existingChildIds = new Set(parentNode.children.map(child => child.id));
 
                             childLogs.forEach(log => {
@@ -276,7 +255,6 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                                         updatedNodes.set(childNodeId, childNode);
                                         parentNode.children.push(childNode);
 
-                                        // Recursively add grandchildren with deduplication
                                         if (log.children) {
                                             const addChildrenRecursively = (children: LogEntry[], parent: GraphNode) => {
                                                 children.forEach(childLog => {
@@ -301,11 +279,101 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                         return updatedNodes;
                     });
                 }
+            } else if (type === 'siblings') {
+                // Load sibling logs using siblingCursor
+                const siblingLogs = await getLogsByBlockId(blockId, maxDepth, maxChildren, node.log.siblingCursor);
+
+                if (siblingLogs.length > 0) {
+                    setGraphNodes(prev => {
+                        const updatedNodes = new Map(prev);
+                        const currentNodeId = getNodeId(node.log);
+                        const currentNode = updatedNodes.get(currentNodeId);
+
+                        if (currentNode && currentNode.parent) {
+                            const parentNode = currentNode.parent;
+                            const existingSiblingIds = new Set(parentNode.children.map(child => child.id));
+
+                            // Add new sibling logs to the parent's children
+                            siblingLogs.forEach(log => {
+                                if (log.id && !existingSiblingIds.has(log.id)) {
+                                    const siblingNodeId = getNodeId(log);
+                                    if (!updatedNodes.has(siblingNodeId)) {
+                                        const siblingNode = createGraphNode(log, parentNode);
+                                        updatedNodes.set(siblingNodeId, siblingNode);
+                                        parentNode.children.push(siblingNode);
+
+                                        // Add nested children if they exist
+                                        if (log.children) {
+                                            const addChildrenRecursively = (children: LogEntry[], parent: GraphNode) => {
+                                                children.forEach(childLog => {
+                                                    if (childLog.id && !updatedNodes.has(getNodeId(childLog))) {
+                                                        const grandChild = createGraphNode(childLog, parent);
+                                                        updatedNodes.set(getNodeId(childLog), grandChild);
+                                                        parent.children.push(grandChild);
+                                                        if (childLog.children) addChildrenRecursively(childLog.children, grandChild);
+                                                    }
+                                                });
+                                            };
+                                            addChildrenRecursively(log.children, siblingNode);
+                                        }
+                                    }
+                                }
+                            });
+
+                            // Update the current node's sibling cursor capability
+                            currentNode.canLoadMoreSiblings = siblingLogs.length === maxChildren;
+
+                            // Update sibling cursor for the last loaded sibling
+                            if (siblingLogs.length > 0) {
+                                const lastSibling = siblingLogs[siblingLogs.length - 1];
+                                const lastSiblingNode = updatedNodes.get(getNodeId(lastSibling));
+                                if (lastSiblingNode) {
+                                    lastSiblingNode.canLoadMoreSiblings = !!lastSibling.siblingCursor;
+                                }
+                            }
+
+                            currentNode.isLoading = false;
+                        } else if (!currentNode.parent) {
+                            // Handle root-level siblings
+                            const existingRootIds = new Set(Array.from(updatedNodes.values())
+                                .filter(n => !n.parent)
+                                .map(n => n.id));
+
+                            siblingLogs.forEach(log => {
+                                if (log.id && !existingRootIds.has(log.id)) {
+                                    const rootNodeId = getNodeId(log);
+                                    if (!updatedNodes.has(rootNodeId)) {
+                                        const rootNode = createGraphNode(log, null);
+                                        updatedNodes.set(rootNodeId, rootNode);
+
+                                        if (log.children) {
+                                            const addChildrenRecursively = (children: LogEntry[], parent: GraphNode) => {
+                                                children.forEach(childLog => {
+                                                    if (childLog.id && !updatedNodes.has(getNodeId(childLog))) {
+                                                        const child = createGraphNode(childLog, parent);
+                                                        updatedNodes.set(getNodeId(childLog), child);
+                                                        parent.children.push(child);
+                                                        if (childLog.children) addChildrenRecursively(childLog.children, child);
+                                                    }
+                                                });
+                                            };
+                                            addChildrenRecursively(log.children, rootNode);
+                                        }
+                                    }
+                                }
+                            });
+
+                            currentNode.canLoadMoreSiblings = siblingLogs.length === maxChildren;
+                            currentNode.isLoading = false;
+                        }
+
+                        return updatedNodes;
+                    });
+                }
             }
         } catch (err) {
             console.error(`Failed to expand ${type}:`, err);
         } finally {
-            // Remove loading state
             setGraphNodes(prev => {
                 const updated = new Map(prev);
                 const nodeToUpdate = updated.get(getNodeId(node.log));
