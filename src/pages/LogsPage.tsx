@@ -1,4 +1,3 @@
-// src/pages/LogsPage.tsx - Smart Child Expansion Implementation
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     addEdge, Background, Connection, Controls, Edge, Handle, MarkerType,
@@ -107,7 +106,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
     const [graphNodes, setGraphNodes] = useState<Map<string, GraphNode>>(new Map());
 
-    const maxDepth = 3, maxChildren = 5;
+    const maxDepth = 3, maxChildren = 2;
 
     const createGraphNode = (log: LogEntry, parent: GraphNode | null = null): GraphNode => ({
         id: log.id, log, children: [], parent, expanded: false,
