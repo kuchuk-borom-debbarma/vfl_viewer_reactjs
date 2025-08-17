@@ -1,4 +1,4 @@
-import { LogEntry } from "../../api/vfl";
+import {LogEntry} from "../../api/vfl";
 import _ from "lodash";
 
 export type FlowNode = {
@@ -14,14 +14,58 @@ export type FlowEdge = {
     target: string;
 };
 
+const mutateSiblingCursor = (logs: LogEntry[]): LogEntry[] => {
+    if (!logs || logs.length === 0) {
+        return [];
+    }
+
+    return logs.map((value, index) => {
+        // Only keep siblingCursor for the last sibling in this level
+        if (index < logs.length - 1) {
+            value.siblingCursor = null;
+        }
+
+        // Recursively process children if they exist
+        if (value.children && value.children.length > 0) {
+            value.children = mutateSiblingCursor(value.children);
+        }
+
+        return value;
+    });
+}
+
+const mutateChildrenCursor = (logs: LogEntry[]): LogEntry[] => {
+    if (!logs || logs.length === 0) {
+        return [];
+    }
+
+    return logs.map((value) => {
+        if (value.children && value.children.length > 0) {
+            // This node has children, so it's not a leaf - set childrenCursor to null
+            value.childrenCursor = null;
+            // Recursively process children
+            value.children = mutateChildrenCursor(value.children);
+        }
+        // If no children, this is a leaf node - keep childrenCursor as is (don't modify it)
+
+        return value;
+    });
+}
+
 // Create nodes from log entries using flatMap approach
 const createNodesFromLogEntries = (logs: LogEntry[]): FlowNode[] => {
     if (_.isEmpty(logs)) return [];
 
+    // Create a deep copy to avoid mutating the original data
+    const logsCopy = _.cloneDeep(logs);
+
+    // Apply cursor mutations
+    const processedLogs = mutateChildrenCursor(mutateSiblingCursor(logsCopy));
+
     // Flatten all log entries into a single array with level information
-    const flattenLogEntries = (entries: LogEntry[], level: number = 0): Array<{entry: LogEntry, level: number}> => {
+    const flattenLogEntries = (entries: LogEntry[], level: number = 0): Array<{ entry: LogEntry, level: number }> => {
         return _.flatMap(entries, (entry) => {
-            const current = { entry, level };
+            const current = {entry, level};
             const children = _.isEmpty(entry.children)
                 ? []
                 : flattenLogEntries(entry.children, level + 1);
@@ -29,7 +73,7 @@ const createNodesFromLogEntries = (logs: LogEntry[]): FlowNode[] => {
         });
     };
 
-    const flatEntries = flattenLogEntries(logs);
+    const flatEntries = flattenLogEntries(processedLogs);
 
     // Group by level to calculate positions
     const entriesByLevel = _.groupBy(flatEntries, 'level');
@@ -53,9 +97,12 @@ const createEdgesFromLogEntries = (logs: LogEntry[]): FlowEdge[] => {
     if (_.isEmpty(logs)) return [];
 
     // Collect all parent-child relationships using flatMap
-    const collectRelationships = (entries: LogEntry[], parentId?: string): Array<{parentId: string, childId: string}> => {
+    const collectRelationships = (entries: LogEntry[], parentId?: string): Array<{
+        parentId: string,
+        childId: string
+    }> => {
         return _.flatMap(entries, (entry) => {
-            const currentRelations = parentId ? [{ parentId, childId: entry.id }] : [];
+            const currentRelations = parentId ? [{parentId, childId: entry.id}] : [];
             const childRelations = _.isEmpty(entry.children)
                 ? []
                 : collectRelationships(entry.children, entry.id);
@@ -76,14 +123,14 @@ const createEdgesFromLogEntries = (logs: LogEntry[]): FlowEdge[] => {
 
 export const createFlowFromLogEntries = (logs: LogEntry[]): { nodes: FlowNode[], edges: FlowEdge[] } => {
     if (_.isEmpty(logs)) {
-        return { nodes: [], edges: [] };
+        return {nodes: [], edges: []};
     }
 
     const nodes = createNodesFromLogEntries(logs);
     const edges = createEdgesFromLogEntries(logs);
 
     return {
-        nodes: _.uniqBy(nodes, 'id'), // Remove any duplicate nodes
-        edges: _.uniqBy(edges, 'id')  // Remove any duplicate edges
+        nodes: _.uniqBy(nodes, 'id'),
+        edges: _.uniqBy(edges, 'id')
     };
 };
