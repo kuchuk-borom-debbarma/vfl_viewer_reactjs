@@ -1,62 +1,190 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import * as d3 from "d3";
+// src/pages/LogsPage.tsx - ReactFlow Implementation
+// @ts-ignore
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+    ReactFlow,
+    MiniMap,
+    Controls,
+    Background,
+    useNodesState,
+    useEdgesState,
+    addEdge,
+    Node,
+    Edge,
+    Connection,
+    NodeTypes,
+    Position,
+    MarkerType,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 import { getLogsByBlockId, LogEntry } from "../api/vfl";
+
+// Custom Node Component
+const LogNode = ({ data }: { data: any }) => {
+    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading } = data;
+
+    const getNodeColor = (logType: string) => {
+        switch(logType.toLowerCase()) {
+            case 'error': return '#dc2626';
+            case 'warning': return '#d97706';
+            case 'debug': return '#7c3aed';
+            case 'info': return '#2563eb';
+            default: return '#059669';
+        }
+    };
+
+    const formatTime = (timestamp: number) => {
+        return new Date(timestamp).toLocaleTimeString('en-US', {
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
+    const truncateText = (text: string, maxLength: number) => {
+        return text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
+    };
+
+    return (
+        <div
+            className="log-node"
+            style={{
+                background: 'white',
+                border: `2px solid ${getNodeColor(log.logType)}`,
+                borderRadius: '8px',
+                padding: '12px',
+                width: '200px',
+                minHeight: '80px',
+                position: 'relative',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+            }}
+            onClick={() => onSelect(log)}
+        >
+            {/* Log Type Badge */}
+            <div
+                style={{
+                    background: getNodeColor(log.logType),
+                    color: 'white',
+                    padding: '2px 6px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px',
+                    display: 'inline-block',
+                }}
+            >
+                {log.logType}
+            </div>
+
+            {/* Log ID */}
+            <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px', fontFamily: 'monospace' }}>
+                {log.id.substring(0, 8)}...
+            </div>
+
+            {/* Message */}
+            <div style={{ fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.3' }}>
+                {truncateText(log.message || 'No message', 30)}
+            </div>
+
+            {/* Timestamp */}
+            <div style={{ fontSize: '9px', color: '#888' }}>
+                {formatTime(log.timestamp)}
+            </div>
+
+            {/* Expand Buttons */}
+            <div style={{ position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px' }}>
+                {canExpandChildren && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onExpand('children');
+                        }}
+                        disabled={isLoading}
+                        style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: '#2563eb',
+                            color: 'white',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                        title="Expand children"
+                    >
+                        {isLoading ? '⏳' : '↓'}
+                    </button>
+                )}
+                {canExpandSiblings && (
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onExpand('siblings');
+                        }}
+                        disabled={isLoading}
+                        style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: '#16a34a',
+                            color: 'white',
+                            fontSize: '10px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                        title="Expand siblings"
+                    >
+                        {isLoading ? '⏳' : '→'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const nodeTypes: NodeTypes = {
+    logNode: LogNode,
+};
 
 interface GraphNode {
     id: string;
     log: LogEntry;
-    x: number;
-    y: number;
-    fx?: number | null;
-    fy?: number | null;
     children: GraphNode[];
     parent: GraphNode | null;
     expanded: boolean;
-    loadingChildren: boolean;
-    loadingSiblings: boolean;
     canLoadMoreChildren: boolean;
     canLoadMoreSiblings: boolean;
-    detailsVisible: boolean;
-    originalX: number; // Store original calculated position
-    originalY: number;
-    depth: number; // Track depth level
+    isLoading: boolean;
 }
 
-interface GraphLink {
-    source: GraphNode;
-    target: GraphNode;
-    timeDelta: string;
-}
-
-export default function GraphLogsPage({
-                                          blockId,
-                                          goBack,
-                                      }: {
+export default function LogsPage({
+                                     blockId,
+                                     goBack,
+                                 }: {
     blockId: string;
     goBack: () => void;
 }) {
-    const svgRef = useRef<SVGSVGElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const simulationRef = useRef<d3.Simulation<GraphNode, undefined> | null>(null);
-    const [nodes, setNodes] = useState<GraphNode[]>([]);
-    const [links, setLinks] = useState<GraphLink[]>([]);
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+    const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+    const [graphNodes, setGraphNodes] = useState<Map<string, GraphNode>>(new Map());
 
     const maxDepth = 3;
     const maxChildren = 5;
 
-    // Layout constants
-    const NODE_WIDTH = 200;
-    const NODE_HEIGHT = 80;
-    const HORIZONTAL_SPACING = 280;
-    const VERTICAL_SPACING = 150;
-    const DRAG_BOUNDARY = 150; // How far nodes can be dragged from original position
-
     const calculateTimeDelta = (parentTime: number, childTime: number): string => {
         const delta = childTime - parentTime;
-        if (delta < 0) return "undefined";
+        if (delta < 0) return 'undefined';
         if (delta < 1000) return `${delta}ms`;
         if (delta < 60000) return `${(delta / 1000).toFixed(1)}s`;
         return `${(delta / 60000).toFixed(1)}m`;
@@ -66,180 +194,197 @@ export default function GraphLogsPage({
         return {
             id: log.id,
             log,
-            x: 0,
-            y: 0,
-            fx: null,
-            fy: null,
             children: [],
             parent,
             expanded: false,
-            loadingChildren: false,
-            loadingSiblings: false,
             canLoadMoreChildren: !!log.childrenCursor || (log.children && log.children.length > 0),
             canLoadMoreSiblings: true,
-            detailsVisible: false,
-            originalX: 0,
-            originalY: 0,
-            depth: parent ? parent.depth + 1 : 0,
+            isLoading: false,
         };
     };
 
-    const calculateNodePositions = (rootNodes: GraphNode[]): void => {
-        const START_Y = 100;
+    const buildNodesAndEdges = (graphNodes: Map<string, GraphNode>) => {
+        const reactFlowNodes: Node[] = [];
+        const reactFlowEdges: Edge[] = [];
+        const processedNodes = new Set<string>();
 
-        // Sort root nodes by timestamp
-        rootNodes.sort((a, b) => a.log.timestamp - b.log.timestamp);
+        // Layout constants
+        const HORIZONTAL_SPACING = 300;
+        const VERTICAL_SPACING = 150;
 
-        // Position root nodes horizontally
-        const totalRootWidth = (rootNodes.length - 1) * HORIZONTAL_SPACING;
-        const startX = -totalRootWidth / 2;
+        // Find root nodes (nodes without parents)
+        const rootNodes = Array.from(graphNodes.values()).filter(node => !node.parent);
+
+        // Position nodes using a tree layout algorithm
+        const positionNode = (node: GraphNode, x: number, y: number, depth: number) => {
+            if (processedNodes.has(node.id)) return;
+
+            processedNodes.add(node.id);
+
+            // Create ReactFlow node
+            reactFlowNodes.push({
+                id: node.id,
+                type: 'logNode',
+                position: { x, y },
+                data: {
+                    log: node.log,
+                    onExpand: (type: 'children' | 'siblings') => handleExpand(node, type),
+                    onSelect: (log: LogEntry) => setSelectedLog(log),
+                    canExpandChildren: node.canLoadMoreChildren,
+                    canExpandSiblings: node.canLoadMoreSiblings,
+                    isLoading: node.isLoading,
+                },
+                sourcePosition: Position.Bottom,
+                targetPosition: Position.Top,
+            });
+
+            // Position children
+            if (node.children.length > 0) {
+                const childrenWidth = (node.children.length - 1) * HORIZONTAL_SPACING;
+                const startX = x - childrenWidth / 2;
+
+                node.children.forEach((child, index) => {
+                    const childX = startX + index * HORIZONTAL_SPACING;
+                    const childY = y + VERTICAL_SPACING;
+
+                    // Create edge
+                    const timeDelta = calculateTimeDelta(node.log.timestamp, child.log.timestamp);
+                    reactFlowEdges.push({
+                        id: `${node.id}-${child.id}`,
+                        source: node.id,
+                        target: child.id,
+                        type: 'smoothstep',
+                        animated: false,
+                        label: timeDelta,
+                        labelStyle: { fontSize: '10px', fill: '#666' },
+                        style: { stroke: '#999', strokeWidth: 2 },
+                        markerEnd: {
+                            type: MarkerType.ArrowClosed,
+                            width: 20,
+                            height: 20,
+                            color: '#999',
+                        },
+                    });
+
+                    positionNode(child, childX, childY, depth + 1);
+                });
+            }
+        };
+
+        // Position root nodes
+        const rootWidth = (rootNodes.length - 1) * HORIZONTAL_SPACING;
+        const rootStartX = -rootWidth / 2;
 
         rootNodes.forEach((node, index) => {
-            node.x = node.originalX = startX + index * HORIZONTAL_SPACING;
-            node.y = node.originalY = START_Y;
-            node.depth = 0;
-
-            // Position children recursively
-            positionChildren(node, node.x, node.y + VERTICAL_SPACING, 1);
+            const x = rootStartX + index * HORIZONTAL_SPACING;
+            positionNode(node, x, 50, 0);
         });
+
+        return { nodes: reactFlowNodes, edges: reactFlowEdges };
     };
 
-    const positionChildren = (parentNode: GraphNode, baseX: number, y: number, depth: number): void => {
-        if (parentNode.children.length === 0) return;
-
-        // Sort children by timestamp
-        parentNode.children.sort((a, b) => a.log.timestamp - b.log.timestamp);
-
-        const totalChildWidth = (parentNode.children.length - 1) * HORIZONTAL_SPACING;
-        const startX = baseX - totalChildWidth / 2;
-
-        parentNode.children.forEach((child, index) => {
-            child.x = child.originalX = startX + index * HORIZONTAL_SPACING;
-            child.y = child.originalY = y;
-            child.depth = depth;
-
-            // Recursively position grandchildren
-            positionChildren(child, child.x, child.y + VERTICAL_SPACING, depth + 1);
-        });
-    };
-
-    const buildGraphFromLogs = (logs: LogEntry[]): { nodes: GraphNode[], links: GraphLink[] } => {
+    const buildGraphFromLogs = (logs: LogEntry[]): Map<string, GraphNode> => {
         const nodeMap = new Map<string, GraphNode>();
-        const nodes: GraphNode[] = [];
-        const links: GraphLink[] = [];
 
-        // Create root nodes first
-        const rootNodes: GraphNode[] = [];
-        logs.forEach(log => {
-            const node = createGraphNode(log);
-            nodeMap.set(log.id, node);
-            nodes.push(node);
-            rootNodes.push(node);
-        });
+        // Create all nodes first
+        const createNodesRecursively = (logs: LogEntry[], parent: GraphNode | null = null) => {
+            logs.forEach(log => {
+                if (!nodeMap.has(log.id)) {
+                    const graphNode = createGraphNode(log, parent);
+                    nodeMap.set(log.id, graphNode);
 
-        // Build tree structure and links
-        const processNode = (parentNode: GraphNode, childLogs: LogEntry[]): void => {
-            childLogs.forEach(childLog => {
-                let childNode = nodeMap.get(childLog.id);
-                if (!childNode) {
-                    childNode = createGraphNode(childLog, parentNode);
-                    nodeMap.set(childLog.id, childNode);
-                    nodes.push(childNode);
-                }
+                    if (parent) {
+                        parent.children.push(graphNode);
+                    }
 
-                parentNode.children.push(childNode);
-                childNode.parent = parentNode;
-
-                // Create link with time delta
-                const timeDelta = calculateTimeDelta(parentNode.log.timestamp, childNode.log.timestamp);
-                links.push({
-                    source: parentNode,
-                    target: childNode,
-                    timeDelta
-                });
-
-                // Process grandchildren if they exist
-                if (childLog.children && childLog.children.length > 0) {
-                    processNode(childNode, childLog.children);
+                    if (log.children && log.children.length > 0) {
+                        createNodesRecursively(log.children, graphNode);
+                    }
                 }
             });
         };
 
-        // Process children for all nodes
-        logs.forEach(log => {
-            if (log.children && log.children.length > 0) {
-                const parentNode = nodeMap.get(log.id)!;
-                processNode(parentNode, log.children);
-            }
-        });
-
-        // Calculate positions
-        calculateNodePositions(rootNodes);
-
-        return { nodes, links };
+        createNodesRecursively(logs);
+        return nodeMap;
     };
 
-    const initializeForceSimulation = useCallback((nodes: GraphNode[]) => {
-        if (simulationRef.current) {
-            simulationRef.current.stop();
+    const handleExpand = async (node: GraphNode, type: 'children' | 'siblings') => {
+        if (node.isLoading) return;
+
+        // Set loading state
+        const updatedGraphNodes = new Map(graphNodes);
+        const nodeToUpdate = updatedGraphNodes.get(node.id);
+        if (nodeToUpdate) {
+            nodeToUpdate.isLoading = true;
+            setGraphNodes(updatedGraphNodes);
+
+            // Update ReactFlow nodes to show loading state
+            const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(updatedGraphNodes);
+            setNodes(newNodes);
         }
 
-        simulationRef.current = d3.forceSimulation(nodes)
-            .force("collision", d3.forceCollide<GraphNode>()
-                .radius(NODE_WIDTH / 2 + 20)
-                .strength(0.8)
-            )
-            .force("charge", d3.forceManyBody<GraphNode>()
-                .strength(-300)
-                .distanceMin(NODE_WIDTH)
-                .distanceMax(NODE_WIDTH * 2)
-            )
-            .force("center", d3.forceCenter(0, 0).strength(0.1))
-            .force("boundary", () => {
-                // Custom force to keep nodes within boundary of their original position
-                nodes.forEach(node => {
-                    if (node.fx !== null && node.fy !== null) return; // Skip if being dragged
+        try {
+            if (type === 'children') {
+                const childLogs = await getLogsByBlockId(
+                    blockId,
+                    maxDepth,
+                    maxChildren,
+                    node.log.childrenCursor
+                );
 
-                    const dx = node.x - node.originalX;
-                    const dy = node.y - node.originalY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
+                if (childLogs.length > 0) {
+                    // Add new children to the graph
+                    const updatedNodes = new Map(graphNodes);
+                    const parentNode = updatedNodes.get(node.id);
 
-                    if (distance > DRAG_BOUNDARY) {
-                        const factor = DRAG_BOUNDARY / distance;
-                        node.x = node.originalX + dx * factor;
-                        node.y = node.originalY + dy * factor;
+                    if (parentNode) {
+                        childLogs.forEach(log => {
+                            if (!updatedNodes.has(log.id)) {
+                                const childNode = createGraphNode(log, parentNode);
+                                updatedNodes.set(log.id, childNode);
+                                parentNode.children.push(childNode);
+
+                                // Recursively add grandchildren
+                                if (log.children) {
+                                    const addChildrenRecursively = (children: LogEntry[], parent: GraphNode) => {
+                                        children.forEach(childLog => {
+                                            if (!updatedNodes.has(childLog.id)) {
+                                                const grandChild = createGraphNode(childLog, parent);
+                                                updatedNodes.set(grandChild.id, grandChild);
+                                                parent.children.push(grandChild);
+
+                                                if (childLog.children) {
+                                                    addChildrenRecursively(childLog.children, grandChild);
+                                                }
+                                            }
+                                        });
+                                    };
+                                    addChildrenRecursively(log.children, childNode);
+                                }
+                            }
+                        });
+
+                        parentNode.expanded = true;
+                        parentNode.canLoadMoreChildren = childLogs.length === maxChildren;
                     }
-                });
-            })
-            .alphaDecay(0.02)
-            .velocityDecay(0.8)
-            .on("tick", () => {
-                updateVisualization();
-            });
 
-        return simulationRef.current;
-    }, []);
-
-    const updateVisualization = () => {
-        if (!svgRef.current) return;
-
-        const svg = d3.select(svgRef.current);
-
-        // Update node positions
-        svg.selectAll(".node")
-            .attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-
-        // Update link positions in real-time
-        svg.selectAll(".link-line")
-            .attr("x1", (d: any) => d.source.x)
-            .attr("y1", (d: any) => d.source.y + NODE_HEIGHT / 2)
-            .attr("x2", (d: any) => d.target.x)
-            .attr("y2", (d: any) => d.target.y - NODE_HEIGHT / 2);
-
-        // Update link labels
-        svg.selectAll(".link-label")
-            .attr("x", (d: any) => (d.source.x + d.target.x) / 2)
-            .attr("y", (d: any) => (d.source.y + d.target.y) / 2);
+                    setGraphNodes(updatedNodes);
+                }
+            } else if (type === 'siblings') {
+                // Implement sibling expansion logic here
+                console.log('Expanding siblings for', node.id);
+            }
+        } catch (err) {
+            console.error(`Failed to expand ${type}:`, err);
+        } finally {
+            // Remove loading state
+            const finalNodes = new Map(graphNodes);
+            const finalNode = finalNodes.get(node.id);
+            if (finalNode) {
+                finalNode.isLoading = false;
+                setGraphNodes(finalNodes);
+            }
+        }
     };
 
     const fetchLogs = async () => {
@@ -247,9 +392,8 @@ export default function GraphLogsPage({
         setError(null);
         try {
             const logs = await getLogsByBlockId(blockId, maxDepth, maxChildren);
-            const { nodes: graphNodes, links: graphLinks } = buildGraphFromLogs(logs);
-            setNodes(graphNodes);
-            setLinks(graphLinks);
+            const graphNodeMap = buildGraphFromLogs(logs);
+            setGraphNodes(graphNodeMap);
         } catch (err: any) {
             setError(err.message || "Failed to load logs");
         } finally {
@@ -257,503 +401,156 @@ export default function GraphLogsPage({
         }
     };
 
-    const expandChildren = async (node: GraphNode) => {
-        if (node.loadingChildren) return;
-
-        // Update node to show loading state
-        setNodes(prev => prev.map(n =>
-            n.id === node.id ? { ...n, loadingChildren: true } : n
-        ));
-
-        try {
-            const childLogs = await getLogsByBlockId(
-                blockId,
-                maxDepth,
-                maxChildren,
-                node.log.childrenCursor
-            );
-
-            if (childLogs.length > 0) {
-                const newNodes: GraphNode[] = [];
-                const newLinks: GraphLink[] = [];
-
-                childLogs.forEach((log, index) => {
-                    const childNode = createGraphNode(log, node);
-
-                    // Position new children relative to parent
-                    const siblingSpacing = HORIZONTAL_SPACING;
-                    const totalWidth = (childLogs.length - 1) * siblingSpacing;
-                    const startX = node.x - totalWidth / 2;
-
-                    childNode.x = childNode.originalX = startX + index * siblingSpacing;
-                    childNode.y = childNode.originalY = node.y + VERTICAL_SPACING;
-                    childNode.depth = node.depth + 1;
-
-                    newNodes.push(childNode);
-
-                    const timeDelta = calculateTimeDelta(node.log.timestamp, log.timestamp);
-                    newLinks.push({
-                        source: node,
-                        target: childNode,
-                        timeDelta
-                    });
-                });
-
-                // Update state with new nodes and links
-                setNodes(prev => {
-                    const updatedNodes = prev.map(n =>
-                        n.id === node.id
-                            ? { ...n, loadingChildren: false, expanded: true, children: [...n.children, ...newNodes] }
-                            : n
-                    );
-                    const allNodes = [...updatedNodes, ...newNodes];
-
-                    // Reinitialize force simulation with new nodes
-                    setTimeout(() => {
-                        initializeForceSimulation(allNodes);
-                    }, 0);
-
-                    return allNodes;
-                });
-
-                setLinks(prev => [...prev, ...newLinks]);
-            }
-        } catch (err) {
-            console.error("Failed to expand children:", err);
+    // Update ReactFlow nodes and edges when graphNodes change
+    useEffect(() => {
+        if (graphNodes.size > 0) {
+            const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(graphNodes);
+            setNodes(newNodes);
+            setEdges(newEdges);
         }
-
-        // Remove loading state
-        setNodes(prev => prev.map(n =>
-            n.id === node.id ? { ...n, loadingChildren: false } : n
-        ));
-    };
-
-    const expandSiblings = async (node: GraphNode) => {
-        if (node.loadingSiblings) return;
-
-        setNodes(prev => prev.map(n =>
-            n.id === node.id ? { ...n, loadingSiblings: true } : n
-        ));
-
-        try {
-            // Simulate loading for now
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (err) {
-            console.error("Failed to expand siblings:", err);
-        }
-
-        setNodes(prev => prev.map(n =>
-            n.id === node.id ? { ...n, loadingSiblings: false } : n
-        ));
-    };
-
-    const initializeGraph = useCallback(() => {
-        if (!svgRef.current || nodes.length === 0) return;
-
-        const svg = d3.select(svgRef.current);
-        const container = d3.select(containerRef.current);
-        const width = container.node()?.getBoundingClientRect().width || 800;
-        const height = container.node()?.getBoundingClientRect().height || 600;
-
-        svg.selectAll("*").remove();
-
-        const g = svg.append("g");
-
-        // Zoom behavior
-        const zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
-            .on("zoom", (event) => {
-                g.attr("transform", event.transform);
-            });
-
-        svg.call(zoom);
-
-        // Define arrow markers
-        svg.append("defs").selectAll("marker")
-            .data(["end"])
-            .enter().append("marker")
-            .attr("id", String)
-            .attr("viewBox", "0 -5 10 10")
-            .attr("refX", 15)
-            .attr("refY", -1.5)
-            .attr("markerWidth", 6)
-            .attr("markerHeight", 6)
-            .attr("orient", "auto")
-            .append("path")
-            .attr("d", "M0,-5L10,0L0,5")
-            .attr("fill", "#666");
-
-        // Create links
-        const linkGroup = g.append("g").attr("class", "links");
-
-        const link = linkGroup.selectAll("g")
-            .data(links)
-            .enter().append("g");
-
-        link.append("line")
-            .attr("class", "link-line")
-            .attr("stroke", "#999")
-            .attr("stroke-width", 2)
-            .attr("marker-end", "url(#end)")
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y + NODE_HEIGHT / 2)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y - NODE_HEIGHT / 2);
-
-        // Add time delta labels on links
-        link.append("text")
-            .attr("class", "link-label")
-            .attr("x", d => (d.source.x + d.target.x) / 2)
-            .attr("y", d => (d.source.y + d.target.y) / 2)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#666")
-            .attr("font-size", "11px")
-            .attr("font-family", "monospace")
-            .attr("background", "white")
-            .text(d => d.timeDelta);
-
-        // Create nodes
-        const nodeGroup = g.append("g").attr("class", "nodes");
-
-        const node = nodeGroup.selectAll("g")
-            .data(nodes)
-            .enter().append("g")
-            .attr("class", "node")
-            .attr("transform", d => `translate(${d.x},${d.y})`)
-            .call(d3.drag<SVGGElement, GraphNode>()
-                .on("start", (event, d) => {
-                    if (!event.active && simulationRef.current) {
-                        simulationRef.current.alphaTarget(0.3).restart();
-                    }
-                    d.fx = d.x;
-                    d.fy = d.y;
-                })
-                .on("drag", (event, d) => {
-                    // Constrain dragging within boundary
-                    const dx = event.x - d.originalX;
-                    const dy = event.y - d.originalY;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-
-                    if (distance <= DRAG_BOUNDARY) {
-                        d.fx = event.x;
-                        d.fy = event.y;
-                    } else {
-                        const factor = DRAG_BOUNDARY / distance;
-                        d.fx = d.originalX + dx * factor;
-                        d.fy = d.originalY + dy * factor;
-                    }
-                })
-                .on("end", (event, d) => {
-                    if (!event.active && simulationRef.current) {
-                        simulationRef.current.alphaTarget(0);
-                    }
-                    // Keep the node at its dragged position
-                    // Don't set fx/fy to null so it stays put
-                })
-            );
-
-        // Node rectangles
-        node.append("rect")
-            .attr("width", NODE_WIDTH)
-            .attr("height", NODE_HEIGHT)
-            .attr("x", -NODE_WIDTH / 2)
-            .attr("y", -NODE_HEIGHT / 2)
-            .attr("rx", 8)
-            .attr("fill", "#ffffff")
-            .attr("stroke", d => {
-                switch(d.log.logType.toLowerCase()) {
-                    case 'error': return '#dc2626';
-                    case 'warning': return '#d97706';
-                    case 'debug': return '#7c3aed';
-                    case 'info': return '#2563eb';
-                    default: return '#059669';
-                }
-            })
-            .attr("stroke-width", 2)
-            .style("cursor", "pointer")
-            .on("click", (event, d) => {
-                setSelectedNode(selectedNode?.id === d.id ? null : d);
-            });
-
-        // Node content
-        const nodeContent = node.append("g").attr("class", "node-content");
-
-        // Log type
-        nodeContent.append("text")
-            .attr("x", 0)
-            .attr("y", -20)
-            .attr("text-anchor", "middle")
-            .attr("fill", d => {
-                switch(d.log.logType.toLowerCase()) {
-                    case 'error': return '#dc2626';
-                    case 'warning': return '#d97706';
-                    case 'debug': return '#7c3aed';
-                    case 'info': return '#2563eb';
-                    default: return '#059669';
-                }
-            })
-            .attr("font-weight", "bold")
-            .attr("font-size", "12px")
-            .text(d => d.log.logType);
-
-        // Trimmed ID
-        nodeContent.append("text")
-            .attr("x", 0)
-            .attr("y", -5)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#666")
-            .attr("font-size", "10px")
-            .attr("font-family", "monospace")
-            .text(d => `${d.log.id.substring(0, 8)}...`);
-
-        // Message (truncated)
-        nodeContent.append("text")
-            .attr("x", 0)
-            .attr("y", 10)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#333")
-            .attr("font-size", "10px")
-            .text(d => {
-                const msg = d.log.message || "No message";
-                return msg.length > 25 ? msg.substring(0, 22) + "..." : msg;
-            });
-
-        // Timestamp
-        nodeContent.append("text")
-            .attr("x", 0)
-            .attr("y", 25)
-            .attr("text-anchor", "middle")
-            .attr("fill", "#888")
-            .attr("font-size", "9px")
-            .text(d => {
-                const date = new Date(d.log.timestamp);
-                return date.toLocaleTimeString('en-US', {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                });
-            });
-
-        // Expand buttons
-        const expandGroup = node.append("g").attr("class", "expand-controls");
-
-        // Children expand button (bottom right)
-        expandGroup.append("circle")
-            .attr("cx", NODE_WIDTH / 2 - 15)
-            .attr("cy", NODE_HEIGHT / 2 - 15)
-            .attr("r", 12)
-            .attr("fill", d => d.canLoadMoreChildren ? "#2563eb" : "#e5e7eb")
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 2)
-            .style("cursor", d => d.canLoadMoreChildren ? "pointer" : "default")
-            .on("click", (event, d) => {
-                event.stopPropagation();
-                if (d.canLoadMoreChildren && !d.loadingChildren) {
-                    expandChildren(d);
-                }
-            });
-
-        expandGroup.append("text")
-            .attr("x", NODE_WIDTH / 2 - 15)
-            .attr("y", NODE_HEIGHT / 2 - 11)
-            .attr("text-anchor", "middle")
-            .attr("fill", "white")
-            .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .style("pointer-events", "none")
-            .text(d => d.loadingChildren ? "⏳" : "↓");
-
-        // Siblings expand button (top right)
-        expandGroup.append("circle")
-            .attr("cx", NODE_WIDTH / 2 - 15)
-            .attr("cy", -NODE_HEIGHT / 2 + 15)
-            .attr("r", 12)
-            .attr("fill", d => d.canLoadMoreSiblings ? "#16a34a" : "#e5e7eb")
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 2)
-            .style("cursor", d => d.canLoadMoreSiblings ? "pointer" : "default")
-            .on("click", (event, d) => {
-                event.stopPropagation();
-                if (d.canLoadMoreSiblings && !d.loadingSiblings) {
-                    expandSiblings(d);
-                }
-            });
-
-        expandGroup.append("text")
-            .attr("x", NODE_WIDTH / 2 - 15)
-            .attr("y", -NODE_HEIGHT / 2 + 19)
-            .attr("text-anchor", "middle")
-            .attr("fill", "white")
-            .attr("font-size", "12px")
-            .attr("font-weight", "bold")
-            .style("pointer-events", "none")
-            .text(d => d.loadingSiblings ? "⏳" : "→");
-
-        // Initialize force simulation
-        initializeForceSimulation(nodes);
-
-        // Center the initial view
-        const bbox = nodeGroup.node()?.getBBox();
-        if (bbox) {
-            const centerX = width / 2 - bbox.x - bbox.width / 2;
-            const centerY = 50;
-            const initialTransform = d3.zoomIdentity.translate(centerX, centerY).scale(0.8);
-            svg.call(zoom.transform, initialTransform);
-        }
-
-    }, [nodes, links, selectedNode, initializeForceSimulation]);
+    }, [graphNodes, setNodes, setEdges]);
 
     useEffect(() => {
         fetchLogs();
     }, [blockId]);
 
-    useEffect(() => {
-        initializeGraph();
+    const onConnect = useCallback((params: Edge | Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
 
-        const handleResize = () => {
-            initializeGraph();
-        };
+    if (loading) {
+        return (
+            <div className="logs-page">
+                <div className="logs-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                    <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
+                    <h2>ReactFlow Graph - Block {blockId}</h2>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+                    <div>Loading graph...</div>
+                </div>
+            </div>
+        );
+    }
 
-        window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            if (simulationRef.current) {
-                simulationRef.current.stop();
-            }
-        };
-    }, [initializeGraph]);
-
-    // Cleanup simulation on unmount
-    useEffect(() => {
-        return () => {
-            if (simulationRef.current) {
-                simulationRef.current.stop();
-            }
-        };
-    }, []);
-
-    const formatTime = (timestamp: number) => {
-        const date = new Date(timestamp);
-        return date.toLocaleString();
-    };
+    if (error) {
+        return (
+            <div className="logs-page">
+                <div className="logs-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                    <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
+                    <h2>ReactFlow Graph - Block {blockId}</h2>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+                    <span>⚠️ {error}</span>
+                    <button className="btn btn-outline" onClick={fetchLogs}>Retry</button>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="logs-page">
-            <div className="logs-header">
-                <button className="btn btn-outline" onClick={goBack}>
-                    ← Back to Operations
-                </button>
-                <h2 className="logs-title">Graph View - Block {blockId}</h2>
+        <div className="logs-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+            <div className="logs-header" style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '16px 24px',
+                borderBottom: '1px solid var(--color-border)',
+                background: 'white'
+            }}>
+                <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
+                <h2 style={{ margin: 0 }}>ReactFlow Graph - Block {blockId}</h2>
             </div>
 
-            {loading && (
-                <div className="logs-loading">
-                    <div className="loading-spinner"></div>
-                    <span>Loading graph...</span>
-                </div>
-            )}
-
-            {error && (
-                <div className="logs-error">
-                    <span>⚠️ {error}</span>
-                    <button className="btn btn-outline" onClick={fetchLogs}>
-                        Retry
-                    </button>
-                </div>
-            )}
-
-            {!loading && !error && (
-                <div className="graph-container" style={{ display: 'flex', height: 'calc(100vh - 120px)' }}>
-                    <div
-                        ref={containerRef}
-                        className="graph-viewport"
-                        style={{ flex: selectedNode ? '0 0 70%' : '1', position: 'relative' }}
+            <div style={{ display: 'flex', flex: 1 }}>
+                <div style={{ flex: selectedLog ? '0 0 70%' : '1', height: '100%' }}>
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        onConnect={onConnect}
+                        nodeTypes={nodeTypes}
+                        fitView
+                        fitViewOptions={{ padding: 0.2 }}
                     >
-                        <svg
-                            ref={svgRef}
-                            width="100%"
-                            height="100%"
-                            style={{ background: '#fafafa', border: '1px solid var(--color-border)' }}
-                        />
-                        <div className="graph-controls" style={{
-                            position: 'absolute',
-                            top: 10,
-                            right: 10,
-                            background: 'white',
-                            padding: '8px',
-                            borderRadius: '6px',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            fontSize: '12px',
-                            color: '#666'
-                        }}>
-                            <div>🖱️ Drag to pan • 🔍 Scroll to zoom</div>
-                            <div>Drag nodes within boundary • Click for details</div>
+                        <Controls />
+                        <MiniMap />
+                        <Background variant="dots" gap={12} size={1} />
+                    </ReactFlow>
+                </div>
+
+                {selectedLog && (
+                    <div style={{
+                        flex: '0 0 30%',
+                        background: 'white',
+                        borderLeft: '1px solid var(--color-border)',
+                        padding: '24px',
+                        overflowY: 'auto'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h3 style={{ margin: 0 }}>Log Details</h3>
+                            <button
+                                onClick={() => setSelectedLog(null)}
+                                style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}
+                            >
+                                ×
+                            </button>
                         </div>
-                    </div>
 
-                    {selectedNode && (
-                        <div className="node-details" style={{
-                            flex: '0 0 30%',
-                            background: 'white',
-                            borderLeft: '1px solid var(--color-border)',
-                            padding: 'var(--space-lg)',
-                            overflowY: 'auto'
-                        }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
-                                <h3 style={{ margin: 0 }}>Log Details</h3>
-                                <button
-                                    onClick={() => setSelectedNode(null)}
-                                    style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}
-                                >
-                                    ×
-                                </button>
+                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                            <strong>ID:</strong> {selectedLog.id}
+                        </div>
+                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                            <strong>Type:</strong>
+                            <span style={{ marginLeft: '8px', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold', color: 'white', background: (() => {
+                                    switch(selectedLog.logType.toLowerCase()) {
+                                        case 'error': return '#dc2626';
+                                        case 'warning': return '#d97706';
+                                        case 'debug': return '#7c3aed';
+                                        case 'info': return '#2563eb';
+                                        default: return '#059669';
+                                    }
+                                })() }}>
+                {selectedLog.logType}
+              </span>
+                        </div>
+                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                            <strong>Timestamp:</strong> {new Date(selectedLog.timestamp).toLocaleString()}
+                        </div>
+                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                            <strong>Message:</strong>
+                            <div style={{
+                                marginTop: '4px',
+                                padding: '8px',
+                                background: '#f8fafc',
+                                borderRadius: '4px',
+                                wordBreak: 'break-word'
+                            }}>
+                                {selectedLog.message || <em>No message</em>}
                             </div>
+                        </div>
 
-                            <div className="detail-section" style={{ marginBottom: 'var(--space-md)' }}>
-                                <strong>ID:</strong> {selectedNode.log.id}
-                            </div>
-                            <div className="detail-section" style={{ marginBottom: 'var(--space-md)' }}>
-                                <strong>Type:</strong>
-                                <span className={`log-type-${selectedNode.log.logType.toLowerCase()}`} style={{ marginLeft: '8px' }}>
-                                    {selectedNode.log.logType}
-                                </span>
-                            </div>
-                            <div className="detail-section" style={{ marginBottom: 'var(--space-md)' }}>
-                                <strong>Timestamp:</strong> {formatTime(selectedNode.log.timestamp)}
-                            </div>
-                            <div className="detail-section" style={{ marginBottom: 'var(--space-md)' }}>
-                                <strong>Message:</strong>
-                                <div style={{
-                                    marginTop: '4px',
-                                    padding: '8px',
-                                    background: '#f8fafc',
-                                    borderRadius: '4px',
-                                    wordBreak: 'break-word'
-                                }}>
-                                    {selectedNode.log.message || <em>No message</em>}
-                                </div>
-                            </div>
-
-                            {selectedNode.log.referencedBlock && (
-                                <div className="detail-section">
-                                    <strong>Referenced Block:</strong>
-                                    <div style={{ marginTop: '8px' }}>
-                                        <div className="card" style={{ textAlign: 'left', margin: 0 }}>
-                                            <div className="card-title" style={{ fontSize: '14px' }}>
-                                                {selectedNode.log.referencedBlock.name}
-                                            </div>
-                                            <div className="card-desc">
-                                                <div><strong>ID:</strong> {selectedNode.log.referencedBlock.id}</div>
-                                            </div>
+                        {selectedLog.referencedBlock && (
+                            <div className="detail-section">
+                                <strong>Referenced Block:</strong>
+                                <div style={{ marginTop: '8px' }}>
+                                    <div style={{
+                                        background: 'white',
+                                        border: '1px solid var(--color-border)',
+                                        padding: '16px',
+                                        borderRadius: '8px'
+                                    }}>
+                                        <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>
+                                            {selectedLog.referencedBlock.name}
+                                        </div>
+                                        <div>
+                                            <strong>ID:</strong> {selectedLog.referencedBlock.id}
                                         </div>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
