@@ -59,29 +59,199 @@
 .nav button:hover {
     color: var(--color-primary);
 }
-.log-item {
-    border-left: 2px solid var(--color-border);
-    padding: 8px 12px;
-    margin-bottom: 8px;
+
+/* Logs Page Styling */
+.logs-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--space-lg);
+}
+
+.logs-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-xl);
+    padding-bottom: var(--space-lg);
+    border-bottom: 2px solid var(--color-border);
+}
+
+.logs-title {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--color-text-dark);
+    margin: 0;
+}
+
+.logs-container {
     background: var(--color-surface);
-    border-radius: 6px;
+    border-radius: 12px;
+    padding: var(--space-lg);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid var(--color-border);
+}
+
+.logs-loading, .logs-error, .logs-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--color-text-light);
+    font-size: var(--text-md);
+}
+
+.logs-error {
+    color: #dc2626;
+    flex-direction: column;
+}
+
+.loading-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-border);
+    border-top: 2px solid var(--color-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Log Tree Styling */
+.log-tree {
+    position: relative;
+}
+
+.log-node {
+    margin-bottom: var(--space-sm);
+}
+
+.log-node-header {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+}
+
+.log-item {
+    flex: 1;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: var(--space-md);
+    transition: all 0.2s ease;
 }
 
 .log-item:hover {
-    background: #f9fafb;
+    border-color: var(--color-primary);
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+}
+
+.log-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 12px;
+    color: var(--color-text-light);
+    margin-bottom: var(--space-xs);
 }
 
 .log-message {
     font-size: var(--text-md);
     color: var(--color-text-dark);
+    line-height: 1.5;
 }
 
 .log-ref-block {
-    margin-top: 6px;
+    margin-top: var(--space-sm);
+    padding: var(--space-sm);
+    background: #f8fafc;
+    border-radius: 6px;
+    border-left: 3px solid var(--color-primary);
+}
+
+.btn-toggle-children {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.btn-toggle-children:hover:not(:disabled) {
+    background: var(--color-primary);
+    color: white;
+    transform: scale(1.1);
+}
+
+.btn-toggle-children:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .log-children {
-    margin-top: 8px;
-    border-left: 1px dashed var(--color-border);
-    padding-left: 12px;
+    margin-top: var(--space-md);
+    margin-left: var(--space-lg);
+    position: relative;
 }
+
+.log-children::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 0;
+    bottom: 20px;
+    width: 2px;
+    background: var(--color-border);
+    border-radius: 1px;
+}
+
+.load-more-container {
+    margin-top: var(--space-md);
+    text-align: center;
+}
+
+.load-more-siblings, .load-more-children {
+    font-size: 14px;
+    padding: var(--space-xs) var(--space-md);
+    border-radius: 6px;
+}
+
+.load-more-siblings {
+    background: #f0f9ff;
+    border-color: #0ea5e9;
+    color: #0ea5e9;
+}
+
+.load-more-children {
+    background: #f0fdf4;
+    border-color: #16a34a;
+    color: #16a34a;
+}
+
+.load-more-siblings:hover:not(:disabled) {
+    background: #e0f2fe;
+}
+
+.load-more-children:hover:not(:disabled) {
+    background: #dcfce7;
+}
+
+/* Log Type Badges */
+.log-type-message { color: #059669; }
+.log-type-error { color: #dc2626; }
+.log-type-warning { color: #d97706; }
+.log-type-debug { color: #7c3aed; }
+.log-type-info { color: #2563eb; }

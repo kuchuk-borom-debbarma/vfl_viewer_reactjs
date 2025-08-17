@@ -3,62 +3,166 @@ import { LogEntry, getLogsByBlockId } from "../api/vfl";
 import LogItem from "./LogItem";
 
 interface Props {
+    logs: LogEntry[];
+    blockId: string;
+    maxDepth: number;
+    maxChildren: number;
+    onLoadMoreSiblings?: (cursor: string) => void;
+    showLoadMoreSiblings?: boolean;
+    loadingSiblings?: boolean;
+    parentLog?: LogEntry | null;
+    depth?: number;
+}
+
+export default function LogTree({
+                                    logs,
+                                    blockId,
+                                    maxDepth,
+                                    maxChildren,
+                                    onLoadMoreSiblings,
+                                    showLoadMoreSiblings = false,
+                                    loadingSiblings = false,
+                                    parentLog = null,
+                                    depth = 0
+                                }: Props) {
+    return (
+        <div className="log-tree" style={{
+            marginLeft: depth > 0 ? 20 : 0,
+            borderLeft: depth > 0 ? '2px solid var(--color-border)' : 'none',
+            paddingLeft: depth > 0 ? 12 : 0
+        }}>
+            {logs.map((log, index) => (
+                <LogNode
+                    key={log.id}
+                    log={log}
+                    blockId={blockId}
+                    maxDepth={maxDepth}
+                    maxChildren={maxChildren}
+                    depth={depth}
+                />
+            ))}
+
+            {showLoadMoreSiblings && onLoadMoreSiblings && (
+                <div className="load-more-container">
+                    <button
+                        className="btn btn-outline load-more-siblings"
+                        onClick={() => {
+                            const lastLog = logs[logs.length - 1];
+                            if (lastLog) {
+                                onLoadMoreSiblings(lastLog.siblingCursor);
+                            }
+                        }}
+                        disabled={loadingSiblings}
+                    >
+                        {loadingSiblings ? "Loading siblings..." : "Load more siblings"}
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function LogNode({ log, blockId, maxDepth, maxChildren, depth }: {
     log: LogEntry;
     blockId: string;
     maxDepth: number;
     maxChildren: number;
-}
-
-export default function LogTree({ log, blockId, maxDepth, maxChildren }: Props) {
+    depth: number;
+}) {
     const [children, setChildren] = useState<LogEntry[]>(log.children || []);
-    const [loading, setLoading] = useState(false);
-    const [reachedEnd, setReachedEnd] = useState(children.length === 0);
+    const [showChildren, setShowChildren] = useState(log.children && log.children.length > 0);
+    const [loadingChildren, setLoadingChildren] = useState(false);
+    const [reachedEndChildren, setReachedEndChildren] = useState(false);
+    const [nextChildrenCursor, setNextChildrenCursor] = useState<string | undefined>(
+        log.childrenCursor || undefined
+    );
 
-    // Derive latest cursor from current children (last child)
-    const childCursor = children.length > 0 ? children[children.length - 1].cursor : undefined;
+    const hasInitialChildren = log.children && log.children.length > 0;
+    const canLoadMoreChildren = !reachedEndChildren && nextChildrenCursor;
 
-    function mergeChildren(existing: LogEntry[], incoming: LogEntry[]) {
-        const seen = new Set(existing.map(c => c.id));
-        const deduped = incoming.filter(c => !seen.has(c.id));
-        return [...existing, ...deduped].sort((a, b) => a.timestamp - b.timestamp);
-    }
+    async function loadMoreChildren() {
+        if (!nextChildrenCursor || loadingChildren) return;
 
-    async function loadMore() {
-        if (loading || reachedEnd) return;
-        setLoading(true);
+        setLoadingChildren(true);
         try {
-            const res = await getLogsByBlockId(blockId, maxDepth, maxChildren, childCursor);
+            const res = await getLogsByBlockId(blockId, maxDepth, maxChildren, nextChildrenCursor);
 
             if (res.length === 0) {
-                setReachedEnd(true);
+                setReachedEndChildren(true);
                 return;
             }
 
-            setChildren(prev => mergeChildren(prev, res));
+            // Merge new children with existing ones, deduplicate by id
+            setChildren(prev => {
+                const seen = new Set(prev.map(c => c.id));
+                const newChildren = res.filter(c => !seen.has(c.id));
+                return [...prev, ...newChildren].sort((a, b) => a.timestamp - b.timestamp);
+            });
+
+            // Update cursor for next pagination
+            if (res.length > 0) {
+                setNextChildrenCursor(res[res.length - 1].childrenCursor);
+            }
+
+            if (res.length < maxChildren) {
+                setReachedEndChildren(true);
+            }
+
+            setShowChildren(true);
+        } catch (error) {
+            console.error("Failed to load children:", error);
         } finally {
-            setLoading(false);
+            setLoadingChildren(false);
+        }
+    }
+
+    function toggleChildren() {
+        if (!hasInitialChildren && children.length === 0) {
+            loadMoreChildren();
+        } else {
+            setShowChildren(!showChildren);
         }
     }
 
     return (
-        <div className="log-tree">
-            <LogItem log={log} />
-            <div className="log-children" style={{ marginLeft: 20, marginTop: 6 }}>
-                {children.map(child => (
-                    <LogTree
-                        key={child.id}
-                        log={child}
-                        blockId={blockId}
-                        maxDepth={maxDepth}
-                        maxChildren={maxChildren}
-                    />
-                ))}
-                {!reachedEnd && (
-                    <button className="btn btn-outline" onClick={loadMore} disabled={loading}>
-                        {loading ? "Loading..." : "Load More"}
+        <div className="log-node">
+            <div className="log-node-header">
+                <LogItem log={log} />
+
+                {(hasInitialChildren || canLoadMoreChildren || children.length > 0) && (
+                    <button
+                        className="btn-toggle-children"
+                        onClick={toggleChildren}
+                        disabled={loadingChildren}
+                    >
+                        {loadingChildren ? "⏳" : showChildren ? "▼" : "▶"}
                     </button>
                 )}
             </div>
+
+            {showChildren && children.length > 0 && (
+                <div className="log-children">
+                    <LogTree
+                        logs={children}
+                        blockId={blockId}
+                        maxDepth={maxDepth}
+                        maxChildren={maxChildren}
+                        depth={depth + 1}
+                    />
+
+                    {canLoadMoreChildren && (
+                        <div className="load-more-container">
+                            <button
+                                className="btn btn-outline load-more-children"
+                                onClick={loadMoreChildren}
+                                disabled={loadingChildren}
+                            >
+                                {loadingChildren ? "Loading children..." : "Load more children"}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
