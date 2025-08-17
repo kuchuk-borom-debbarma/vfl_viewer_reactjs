@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "lib": ["es2015", "dom", "dom.iterable"], // Add "es2015" here
+    "target": "es2015", // Ensure target is ES2015+
+    "module": "esnext",
+    "jsx": "react",
+    "allowSyntheticDefaultImports": true
+    // ... other options
+  }
+}

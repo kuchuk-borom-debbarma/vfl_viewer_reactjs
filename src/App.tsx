@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Landing from "./pages/Landing";
 import Operations from "./pages/Operations";
-import LogsPage from "./pages/LogsPage"; // ✅ new import
+import LogsPage from "./pages/LogsPage";
 
 export function App() {
     const PAGES = {
