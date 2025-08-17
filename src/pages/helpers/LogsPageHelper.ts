@@ -62,63 +62,57 @@ const createNodesFromLogEntries = (logs: LogEntry[]): FlowNode[] => {
     // Apply cursor mutations
     const processedLogs = mutateChildrenCursor(mutateSiblingCursor(logsCopy));
 
-    // Flatten all log entries into a single array with level information
-    const flattenLogEntries = (entries: LogEntry[], level: number = 0): Array<{ entry: LogEntry, level: number }> => {
+    // Flatten all log entries into a single array
+    const flattenLogEntries = (entries: LogEntry[]): LogEntry[] => {
         return _.flatMap(entries, (entry) => {
-            const current = {entry, level};
-            const children = _.isEmpty(entry.children)
-                ? []
-                : flattenLogEntries(entry.children, level + 1);
-            return [current, ...children];
+            const children = _.isEmpty(entry.children) ? [] : flattenLogEntries(entry.children);
+            return [entry, ...children];
         });
     };
 
     const flatEntries = flattenLogEntries(processedLogs);
 
-    // Group by level to calculate positions
-    const entriesByLevel = _.groupBy(flatEntries, 'level');
-
-    // Create nodes with better positioning
-    return _.flatMap(entriesByLevel, (levelEntries, level) => {
-        return _.map(levelEntries, (item, index) => ({
-            id: item.entry.id,
-            type: 'logNode',
-            position: {
-                x: index * 300,
-                y: parseInt(level) * 180
-            },
-            data: item.entry
-        }));
-    });
+    // Create nodes with simple positioning (will be overridden by layout)
+    return _.map(flatEntries, (entry, index) => ({
+        id: entry.id,
+        type: 'logNode',
+        position: {
+            x: index * 300,
+            y: 0
+        },
+        data: entry
+    }));
 };
 
-// Create edges using flatMap approach
+// Create edges based PURELY on parentLogId - NO dependency on children array
 const createEdgesFromLogEntries = (logs: LogEntry[]): FlowEdge[] => {
     if (_.isEmpty(logs)) return [];
 
-    // Collect all parent-child relationships using flatMap
-    const collectRelationships = (entries: LogEntry[], parentId?: string): Array<{
-        parentId: string,
-        childId: string
-    }> => {
+    // Flatten all log entries first
+    const flattenLogEntries = (entries: LogEntry[]): LogEntry[] => {
         return _.flatMap(entries, (entry) => {
-            const currentRelations = parentId ? [{parentId, childId: entry.id}] : [];
-            const childRelations = _.isEmpty(entry.children)
-                ? []
-                : collectRelationships(entry.children, entry.id);
-
-            return [...currentRelations, ...childRelations];
+            const children = _.isEmpty(entry.children) ? [] : flattenLogEntries(entry.children);
+            return [entry, ...children];
         });
     };
 
-    const relationships = collectRelationships(logs);
+    const allEntries = flattenLogEntries(logs);
 
-    // Convert relationships to edges using map
-    return _.map(relationships, (rel) => ({
-        id: `${rel.parentId}-${rel.childId}`,
-        source: rel.parentId,
-        target: rel.childId
+    // Create edges based ONLY on parentLogId field
+    const edges = _.compact(_.map(allEntries, (entry) => {
+        if (!entry.parentLogId) {
+            // This is a root node, no edge needed
+            return null;
+        }
+
+        return {
+            id: `${entry.parentLogId}-${entry.id}`,
+            source: entry.parentLogId,
+            target: entry.id
+        };
     }));
+
+    return _.uniqBy(edges, 'id');
 };
 
 export const createFlowFromLogEntries = (logs: LogEntry[]): { nodes: FlowNode[], edges: FlowEdge[] } => {

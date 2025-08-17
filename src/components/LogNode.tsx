@@ -42,13 +42,13 @@ const LogNode = ({ data, isConnectable = true, onLoadMoreChildren, onLoadMoreSib
 
     const handleChildrenPagination = () => {
         if (onLoadMoreChildren && logEntry.childrenCursor) {
-            onLoadMoreChildren(logEntry.childrenCursor);
+            onLoadMoreChildren(logEntry);
         }
     };
 
     const handleSiblingPagination = () => {
         if (onLoadMoreSiblings && logEntry.siblingCursor) {
-            onLoadMoreSiblings(logEntry.siblingCursor);
+            onLoadMoreSiblings(logEntry);
         }
     };
 
