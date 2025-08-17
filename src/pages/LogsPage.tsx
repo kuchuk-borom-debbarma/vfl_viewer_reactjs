@@ -7,8 +7,8 @@ interface GraphNode {
     log: LogEntry;
     x: number;
     y: number;
-    fx?: number;
-    fy?: number;
+    fx?: number | null;
+    fy?: number | null;
     children: GraphNode[];
     parent: GraphNode | null;
     expanded: boolean;
@@ -17,6 +17,9 @@ interface GraphNode {
     canLoadMoreChildren: boolean;
     canLoadMoreSiblings: boolean;
     detailsVisible: boolean;
+    originalX: number; // Store original calculated position
+    originalY: number;
+    depth: number; // Track depth level
 }
 
 interface GraphLink {
@@ -34,6 +37,7 @@ export default function GraphLogsPage({
 }) {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const simulationRef = useRef<d3.Simulation<GraphNode, undefined> | null>(null);
     const [nodes, setNodes] = useState<GraphNode[]>([]);
     const [links, setLinks] = useState<GraphLink[]>([]);
     const [loading, setLoading] = useState(true);
@@ -42,6 +46,13 @@ export default function GraphLogsPage({
 
     const maxDepth = 3;
     const maxChildren = 5;
+
+    // Layout constants
+    const NODE_WIDTH = 200;
+    const NODE_HEIGHT = 80;
+    const HORIZONTAL_SPACING = 280;
+    const VERTICAL_SPACING = 150;
+    const DRAG_BOUNDARY = 150; // How far nodes can be dragged from original position
 
     const calculateTimeDelta = (parentTime: number, childTime: number): string => {
         const delta = childTime - parentTime;
@@ -57,6 +68,8 @@ export default function GraphLogsPage({
             log,
             x: 0,
             y: 0,
+            fx: null,
+            fy: null,
             children: [],
             parent,
             expanded: false,
@@ -65,12 +78,13 @@ export default function GraphLogsPage({
             canLoadMoreChildren: !!log.childrenCursor || (log.children && log.children.length > 0),
             canLoadMoreSiblings: true,
             detailsVisible: false,
+            originalX: 0,
+            originalY: 0,
+            depth: parent ? parent.depth + 1 : 0,
         };
     };
 
     const calculateNodePositions = (rootNodes: GraphNode[]): void => {
-        const HORIZONTAL_SPACING = 250;
-        const VERTICAL_SPACING = 150;
         const START_Y = 100;
 
         // Sort root nodes by timestamp
@@ -81,31 +95,31 @@ export default function GraphLogsPage({
         const startX = -totalRootWidth / 2;
 
         rootNodes.forEach((node, index) => {
-            node.x = startX + index * HORIZONTAL_SPACING;
-            node.y = START_Y;
+            node.x = node.originalX = startX + index * HORIZONTAL_SPACING;
+            node.y = node.originalY = START_Y;
+            node.depth = 0;
 
             // Position children recursively
-            positionChildren(node, node.x, node.y + VERTICAL_SPACING);
+            positionChildren(node, node.x, node.y + VERTICAL_SPACING, 1);
         });
     };
 
-    const positionChildren = (parentNode: GraphNode, baseX: number, y: number): void => {
+    const positionChildren = (parentNode: GraphNode, baseX: number, y: number, depth: number): void => {
         if (parentNode.children.length === 0) return;
 
         // Sort children by timestamp
         parentNode.children.sort((a, b) => a.log.timestamp - b.log.timestamp);
 
-        const HORIZONTAL_SPACING = 250;
-        const VERTICAL_SPACING = 150;
         const totalChildWidth = (parentNode.children.length - 1) * HORIZONTAL_SPACING;
         const startX = baseX - totalChildWidth / 2;
 
         parentNode.children.forEach((child, index) => {
-            child.x = startX + index * HORIZONTAL_SPACING;
-            child.y = y;
+            child.x = child.originalX = startX + index * HORIZONTAL_SPACING;
+            child.y = child.originalY = y;
+            child.depth = depth;
 
             // Recursively position grandchildren
-            positionChildren(child, child.x, child.y + VERTICAL_SPACING);
+            positionChildren(child, child.x, child.y + VERTICAL_SPACING, depth + 1);
         });
     };
 
@@ -165,6 +179,69 @@ export default function GraphLogsPage({
         return { nodes, links };
     };
 
+    const initializeForceSimulation = useCallback((nodes: GraphNode[]) => {
+        if (simulationRef.current) {
+            simulationRef.current.stop();
+        }
+
+        simulationRef.current = d3.forceSimulation(nodes)
+            .force("collision", d3.forceCollide<GraphNode>()
+                .radius(NODE_WIDTH / 2 + 20)
+                .strength(0.8)
+            )
+            .force("charge", d3.forceManyBody<GraphNode>()
+                .strength(-300)
+                .distanceMin(NODE_WIDTH)
+                .distanceMax(NODE_WIDTH * 2)
+            )
+            .force("center", d3.forceCenter(0, 0).strength(0.1))
+            .force("boundary", () => {
+                // Custom force to keep nodes within boundary of their original position
+                nodes.forEach(node => {
+                    if (node.fx !== null && node.fy !== null) return; // Skip if being dragged
+
+                    const dx = node.x - node.originalX;
+                    const dy = node.y - node.originalY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance > DRAG_BOUNDARY) {
+                        const factor = DRAG_BOUNDARY / distance;
+                        node.x = node.originalX + dx * factor;
+                        node.y = node.originalY + dy * factor;
+                    }
+                });
+            })
+            .alphaDecay(0.02)
+            .velocityDecay(0.8)
+            .on("tick", () => {
+                updateVisualization();
+            });
+
+        return simulationRef.current;
+    }, []);
+
+    const updateVisualization = () => {
+        if (!svgRef.current) return;
+
+        const svg = d3.select(svgRef.current);
+
+        // Update node positions
+        svg.selectAll(".node")
+            .attr("transform", (d: any) => `translate(${d.x},${d.y})`);
+
+        // Update link positions in real-time
+        svg.selectAll(".link-line")
+            .attr("x1", (d: any) => d.source.x)
+            .attr("y1", (d: any) => d.source.y + NODE_HEIGHT / 2)
+            .attr("x2", (d: any) => d.target.x)
+            .attr("y2", (d: any) => d.target.y - NODE_HEIGHT / 2);
+
+        // Update link labels
+        svg.selectAll(".link-label")
+            .attr("x", (d: any) => (d.source.x + d.target.x) / 2)
+            .attr("y", (d: any) => (d.source.y + d.target.y) / 2);
+    };
+
     const fetchLogs = async () => {
         setLoading(true);
         setError(null);
@@ -200,8 +277,18 @@ export default function GraphLogsPage({
                 const newNodes: GraphNode[] = [];
                 const newLinks: GraphLink[] = [];
 
-                childLogs.forEach(log => {
+                childLogs.forEach((log, index) => {
                     const childNode = createGraphNode(log, node);
+
+                    // Position new children relative to parent
+                    const siblingSpacing = HORIZONTAL_SPACING;
+                    const totalWidth = (childLogs.length - 1) * siblingSpacing;
+                    const startX = node.x - totalWidth / 2;
+
+                    childNode.x = childNode.originalX = startX + index * siblingSpacing;
+                    childNode.y = childNode.originalY = node.y + VERTICAL_SPACING;
+                    childNode.depth = node.depth + 1;
+
                     newNodes.push(childNode);
 
                     const timeDelta = calculateTimeDelta(node.log.timestamp, log.timestamp);
@@ -221,9 +308,10 @@ export default function GraphLogsPage({
                     );
                     const allNodes = [...updatedNodes, ...newNodes];
 
-                    // Recalculate positions for all nodes
-                    const rootNodes = allNodes.filter(n => !n.parent);
-                    calculateNodePositions(rootNodes);
+                    // Reinitialize force simulation with new nodes
+                    setTimeout(() => {
+                        initializeForceSimulation(allNodes);
+                    }, 0);
 
                     return allNodes;
                 });
@@ -248,8 +336,7 @@ export default function GraphLogsPage({
         ));
 
         try {
-            // Load more sibling logs - this would need the proper cursor logic
-            // For now, just simulate the loading state
+            // Simulate loading for now
             await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err) {
             console.error("Failed to expand siblings:", err);
@@ -304,13 +391,14 @@ export default function GraphLogsPage({
             .enter().append("g");
 
         link.append("line")
+            .attr("class", "link-line")
             .attr("stroke", "#999")
             .attr("stroke-width", 2)
             .attr("marker-end", "url(#end)")
             .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y + 40) // Start from bottom of source node
+            .attr("y1", d => d.source.y + NODE_HEIGHT / 2)
             .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y - 40); // End at top of target node
+            .attr("y2", d => d.target.y - NODE_HEIGHT / 2);
 
         // Add time delta labels on links
         link.append("text")
@@ -334,40 +422,42 @@ export default function GraphLogsPage({
             .attr("transform", d => `translate(${d.x},${d.y})`)
             .call(d3.drag<SVGGElement, GraphNode>()
                 .on("start", (event, d) => {
+                    if (!event.active && simulationRef.current) {
+                        simulationRef.current.alphaTarget(0.3).restart();
+                    }
                     d.fx = d.x;
                     d.fy = d.y;
                 })
                 .on("drag", (event, d) => {
-                    d.fx = event.x;
-                    d.fy = event.y;
-                    d.x = event.x;
-                    d.y = event.y;
-                    d3.select(event.sourceEvent.target.parentNode)
-                        .attr("transform", `translate(${event.x},${event.y})`);
+                    // Constrain dragging within boundary
+                    const dx = event.x - d.originalX;
+                    const dy = event.y - d.originalY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
 
-                    // Update connected links
-                    linkGroup.selectAll("line")
-                        .attr("x1", d => (d.source as GraphNode).x)
-                        .attr("y1", d => (d.source as GraphNode).y + 40)
-                        .attr("x2", d => (d.target as GraphNode).x)
-                        .attr("y2", d => (d.target as GraphNode).y - 40);
-
-                    linkGroup.selectAll("text")
-                        .attr("x", d => ((d.source as GraphNode).x + (d.target as GraphNode).x) / 2)
-                        .attr("y", d => ((d.source as GraphNode).y + (d.target as GraphNode).y) / 2);
+                    if (distance <= DRAG_BOUNDARY) {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    } else {
+                        const factor = DRAG_BOUNDARY / distance;
+                        d.fx = d.originalX + dx * factor;
+                        d.fy = d.originalY + dy * factor;
+                    }
                 })
                 .on("end", (event, d) => {
-                    d.fx = null;
-                    d.fy = null;
+                    if (!event.active && simulationRef.current) {
+                        simulationRef.current.alphaTarget(0);
+                    }
+                    // Keep the node at its dragged position
+                    // Don't set fx/fy to null so it stays put
                 })
             );
 
         // Node rectangles
         node.append("rect")
-            .attr("width", 200)
-            .attr("height", 80)
-            .attr("x", -100)
-            .attr("y", -40)
+            .attr("width", NODE_WIDTH)
+            .attr("height", NODE_HEIGHT)
+            .attr("x", -NODE_WIDTH / 2)
+            .attr("y", -NODE_HEIGHT / 2)
             .attr("rx", 8)
             .attr("fill", "#ffffff")
             .attr("stroke", d => {
@@ -450,8 +540,8 @@ export default function GraphLogsPage({
 
         // Children expand button (bottom right)
         expandGroup.append("circle")
-            .attr("cx", 85)
-            .attr("cy", 25)
+            .attr("cx", NODE_WIDTH / 2 - 15)
+            .attr("cy", NODE_HEIGHT / 2 - 15)
             .attr("r", 12)
             .attr("fill", d => d.canLoadMoreChildren ? "#2563eb" : "#e5e7eb")
             .attr("stroke", "#fff")
@@ -465,8 +555,8 @@ export default function GraphLogsPage({
             });
 
         expandGroup.append("text")
-            .attr("x", 85)
-            .attr("y", 29)
+            .attr("x", NODE_WIDTH / 2 - 15)
+            .attr("y", NODE_HEIGHT / 2 - 11)
             .attr("text-anchor", "middle")
             .attr("fill", "white")
             .attr("font-size", "12px")
@@ -476,8 +566,8 @@ export default function GraphLogsPage({
 
         // Siblings expand button (top right)
         expandGroup.append("circle")
-            .attr("cx", 85)
-            .attr("cy", -25)
+            .attr("cx", NODE_WIDTH / 2 - 15)
+            .attr("cy", -NODE_HEIGHT / 2 + 15)
             .attr("r", 12)
             .attr("fill", d => d.canLoadMoreSiblings ? "#16a34a" : "#e5e7eb")
             .attr("stroke", "#fff")
@@ -491,14 +581,17 @@ export default function GraphLogsPage({
             });
 
         expandGroup.append("text")
-            .attr("x", 85)
-            .attr("y", -21)
+            .attr("x", NODE_WIDTH / 2 - 15)
+            .attr("y", -NODE_HEIGHT / 2 + 19)
             .attr("text-anchor", "middle")
             .attr("fill", "white")
             .attr("font-size", "12px")
             .attr("font-weight", "bold")
             .style("pointer-events", "none")
             .text(d => d.loadingSiblings ? "⏳" : "→");
+
+        // Initialize force simulation
+        initializeForceSimulation(nodes);
 
         // Center the initial view
         const bbox = nodeGroup.node()?.getBBox();
@@ -509,7 +602,7 @@ export default function GraphLogsPage({
             svg.call(zoom.transform, initialTransform);
         }
 
-    }, [nodes, links, selectedNode]);
+    }, [nodes, links, selectedNode, initializeForceSimulation]);
 
     useEffect(() => {
         fetchLogs();
@@ -523,8 +616,22 @@ export default function GraphLogsPage({
         };
 
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (simulationRef.current) {
+                simulationRef.current.stop();
+            }
+        };
     }, [initializeGraph]);
+
+    // Cleanup simulation on unmount
+    useEffect(() => {
+        return () => {
+            if (simulationRef.current) {
+                simulationRef.current.stop();
+            }
+        };
+    }, []);
 
     const formatTime = (timestamp: number) => {
         const date = new Date(timestamp);
@@ -581,7 +688,7 @@ export default function GraphLogsPage({
                             color: '#666'
                         }}>
                             <div>🖱️ Drag to pan • 🔍 Scroll to zoom</div>
-                            <div>Click nodes for details • ↓ Children • → Siblings</div>
+                            <div>Drag nodes within boundary • Click for details</div>
                         </div>
                     </div>
 
