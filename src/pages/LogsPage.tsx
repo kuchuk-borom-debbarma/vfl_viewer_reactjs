@@ -1,10 +1,23 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
-    addEdge, Background, Connection, Controls, Edge, Handle, MarkerType,
-    MiniMap, Node, NodeTypes, Position, ReactFlow, useEdgesState, useNodesState,
+    addEdge,
+    Background,
+    Connection,
+    Controls,
+    Edge,
+    Handle,
+    MarkerType,
+    MiniMap,
+    Node,
+    NodeTypes,
+    Position,
+    ReactFlow,
+    useEdgesState,
+    useNodesState,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { getLogsByBlockId, LogEntry } from "../api/vfl";
+import {getLogsByBlockId, LogEntry} from "../api/vfl";
+import {calculateTimeDelta, formatTime, truncateText} from "../utils/formatters";
 
 // Utility functions
 const getNodeColor = (logType: string) => ({
@@ -12,30 +25,24 @@ const getNodeColor = (logType: string) => ({
     info: '#2563eb', default: '#059669'
 }[logType.toLowerCase()] || '#059669');
 
-const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString('en-US', {
-    hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit'
-});
-
-const truncateText = (text: string, maxLength: number) =>
-    text.length > maxLength ? text.substring(0, maxLength - 3) + '...' : text;
-
-const calculateTimeDelta = (parentTime: number, childTime: number): string => {
-    const delta = childTime - parentTime;
-    if (delta < 0) return 'undefined';
-    if (delta < 1000) return `${delta}ms`;
-    if (delta < 60000) return `${(delta / 1000).toFixed(1)}s`;
-    return `${(delta / 60000).toFixed(1)}m`;
-};
-
 const getNodeId = (log: LogEntry): string => log.parentLogId === null ? "ROOT" : log.id;
 
 // Custom Node Component
-const LogNode = ({ data }: { data: any }) => {
-    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading, isLatestInBranch, isLatestSibling } = data;
+const LogNode = ({data}: { data: any }) => {
+    const {
+        log,
+        onExpand,
+        onSelect,
+        canExpandChildren,
+        canExpandSiblings,
+        isLoading,
+        isLatestInBranch,
+        isLatestSibling
+    } = data;
 
     return (
         <>
-            <Handle type="target" position={Position.Top} style={{ background: '#555', width: 8, height: 8 }} />
+            <Handle type="target" position={Position.Top} style={{background: '#555', width: 8, height: 8}}/>
 
             <div className="log-node" style={{
                 background: 'white', border: `2px solid ${getNodeColor(log.logType)}`,
@@ -49,21 +56,24 @@ const LogNode = ({ data }: { data: any }) => {
                     marginBottom: '4px', display: 'inline-block',
                 }}>{log.logType}</div>
 
-                <div style={{ fontSize: '10px', color: '#666', marginBottom: '4px', fontFamily: 'monospace' }}>
+                <div style={{fontSize: '10px', color: '#666', marginBottom: '4px', fontFamily: 'monospace'}}>
                     {log.id.substring(0, 8)}...
                 </div>
 
-                <div style={{ fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.3' }}>
+                <div style={{fontSize: '12px', color: '#333', marginBottom: '4px', lineHeight: '1.3'}}>
                     {truncateText(log.message || 'No message', 30)}
                 </div>
 
-                <div style={{ fontSize: '9px', color: '#888' }}>
+                <div style={{fontSize: '9px', color: '#888'}}>
                     {formatTime(log.timestamp)}
                 </div>
 
-                <div style={{ position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px' }}>
+                <div style={{position: 'absolute', top: '-8px', right: '-8px', display: 'flex', gap: '4px'}}>
                     {canExpandChildren && isLatestInBranch && (
-                        <button onClick={(e) => { e.stopPropagation(); onExpand('children'); }}
+                        <button onClick={(e) => {
+                            e.stopPropagation();
+                            onExpand('children');
+                        }}
                                 disabled={isLoading} style={{
                             width: '20px', height: '20px', borderRadius: '50%', border: 'none',
                             background: '#2563eb', color: 'white', fontSize: '10px', cursor: 'pointer',
@@ -73,7 +83,10 @@ const LogNode = ({ data }: { data: any }) => {
                         </button>
                     )}
                     {canExpandSiblings && isLatestSibling && (
-                        <button onClick={(e) => { e.stopPropagation(); onExpand('siblings'); }}
+                        <button onClick={(e) => {
+                            e.stopPropagation();
+                            onExpand('siblings');
+                        }}
                                 disabled={isLoading} style={{
                             width: '20px', height: '20px', borderRadius: '50%', border: 'none',
                             background: '#16a34a', color: 'white', fontSize: '10px', cursor: 'pointer',
@@ -85,19 +98,25 @@ const LogNode = ({ data }: { data: any }) => {
                 </div>
             </div>
 
-            <Handle type="source" position={Position.Bottom} style={{ background: '#555', width: 8, height: 8 }} />
+            <Handle type="source" position={Position.Bottom} style={{background: '#555', width: 8, height: 8}}/>
         </>
     );
 };
 
-const nodeTypes: NodeTypes = { logNode: LogNode };
+const nodeTypes: NodeTypes = {logNode: LogNode};
 
 interface GraphNode {
-    id: string; log: LogEntry; children: GraphNode[]; parent: GraphNode | null;
-    expanded: boolean; canLoadMoreChildren: boolean; canLoadMoreSiblings: boolean; isLoading: boolean;
+    id: string;
+    log: LogEntry;
+    children: GraphNode[];
+    parent: GraphNode | null;
+    expanded: boolean;
+    canLoadMoreChildren: boolean;
+    canLoadMoreSiblings: boolean;
+    isLoading: boolean;
 }
 
-export default function LogsPage({ blockId, goBack }: { blockId: string; goBack: () => void }) {
+export default function LogsPage({blockId, goBack}: { blockId: string; goBack: () => void }) {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
     const [loading, setLoading] = useState(true);
@@ -115,16 +134,27 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
 
     const isLatestInBranch = (node: GraphNode): boolean => node.children.length === 0;
 
-    const isLatestSibling = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
-        const siblings = Array.from(allNodes.values()).filter(n =>
-            n.parent?.id === node.parent?.id && n.id !== node.id
+    // Replace the isLatestSibling function with this corrected version
+    const isOldestSiblingWithCursor = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
+        // Only show expand button if this node has a sibling cursor
+        if (!node.canLoadMoreSiblings) return false;
+
+        // Get all siblings (excluding current node) that can load more siblings
+        const siblingsWithCursor = Array.from(allNodes.values()).filter(n =>
+            n.parent?.id === node.parent?.id && n.id !== node.id && n.canLoadMoreSiblings
         );
-        if (siblings.length === 0) return true;
-        return siblings.every(sibling => {
+
+        // If no other siblings with cursor, this node gets the button
+        if (siblingsWithCursor.length === 0) return true;
+
+        // Check if this node is the OLDEST among siblings with cursors
+        // Since backend uses DESC order, we want the chronologically oldest (smallest timestamp)
+        return siblingsWithCursor.every(sibling => {
             if (node.log.timestamp !== sibling.log.timestamp) {
-                return node.log.timestamp > sibling.log.timestamp;
+                return node.log.timestamp < sibling.log.timestamp; // Current node should be OLDER
             }
-            return node.log.id > sibling.log.id;
+            // When timestamps are equal, use ascending ID comparison (opposite of backend DESC)
+            return node.log.id < sibling.log.id;
         });
     };
 
@@ -142,10 +172,10 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             processedNodes.add(nodeId);
 
             const isLatest = isLatestInBranch(node);
-            const isLatestSib = isLatestSibling(node, graphNodes);
+            const isLatestSib = isOldestSiblingWithCursor(node, graphNodes);
 
             reactFlowNodes.push({
-                id: nodeId, type: 'logNode', position: { x, y },
+                id: nodeId, type: 'logNode', position: {x, y},
                 data: {
                     log: node.log,
                     onExpand: (type: 'children' | 'siblings') => handleExpand(node, type),
@@ -172,9 +202,9 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                         source: nodeId, target: childNodeId, type: 'smoothstep',
                         animated: false,
                         label: calculateTimeDelta(node.log.timestamp, child.log.timestamp),
-                        labelStyle: { fontSize: '10px', fill: '#666' },
-                        style: { stroke: '#999', strokeWidth: 2 },
-                        markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: '#999' },
+                        labelStyle: {fontSize: '10px', fill: '#666'},
+                        style: {stroke: '#999', strokeWidth: 2},
+                        markerEnd: {type: MarkerType.ArrowClosed, width: 20, height: 20, color: '#999'},
                     });
 
                     positionNode(child, childX, childY);
@@ -191,7 +221,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             });
         }
 
-        return { nodes: reactFlowNodes, edges: reactFlowEdges };
+        return {nodes: reactFlowNodes, edges: reactFlowEdges};
     };
 
     const buildGraphFromLogs = (logs: LogEntry[]): Map<string, GraphNode> => {
@@ -401,7 +431,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
 
     useEffect(() => {
         if (graphNodes.size > 0) {
-            const { nodes: newNodes, edges: newEdges } = buildNodesAndEdges(graphNodes);
+            const {nodes: newNodes, edges: newEdges} = buildNodesAndEdges(graphNodes);
             if (newNodes.length > 0) {
                 setNodes(newNodes);
                 setEdges(newEdges);
@@ -409,7 +439,9 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
         }
     }, [graphNodes, setNodes, setEdges]);
 
-    useEffect(() => { fetchLogs(); }, [blockId]);
+    useEffect(() => {
+        fetchLogs();
+    }, [blockId]);
 
     const onConnect = useCallback((params: Edge | Connection) => {
         if (params.source && params.target && params.source !== params.target) {
@@ -420,11 +452,12 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     if (loading) {
         return (
             <div className="logs-page">
-                <div className="logs-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <div className="logs-header"
+                     style={{display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px'}}>
                     <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
                     <h2>ReactFlow Graph - Block {blockId}</h2>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px' }}>
+                <div style={{display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px'}}>
                     <div>Loading graph...</div>
                 </div>
             </div>
@@ -434,11 +467,19 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     if (error) {
         return (
             <div className="logs-page">
-                <div className="logs-header" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+                <div className="logs-header"
+                     style={{display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px'}}>
                     <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
                     <h2>ReactFlow Graph - Block {blockId}</h2>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', gap: '16px' }}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    height: '400px',
+                    gap: '16px'
+                }}>
                     <span>⚠️ {error}</span>
                     <button className="btn btn-outline" onClick={fetchLogs}>Retry</button>
                 </div>
@@ -447,25 +488,25 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
     }
 
     return (
-        <div className="logs-page" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <div className="logs-page" style={{height: '100vh', display: 'flex', flexDirection: 'column'}}>
             <div className="logs-header" style={{
                 display: 'flex', alignItems: 'center', gap: '16px', padding: '16px 24px',
                 borderBottom: '1px solid var(--color-border)', background: 'white'
             }}>
                 <button className="btn btn-outline" onClick={goBack}>← Back to Operations</button>
-                <h2 style={{ margin: 0 }}>ReactFlow Graph - Block {blockId}</h2>
+                <h2 style={{margin: 0}}>ReactFlow Graph - Block {blockId}</h2>
             </div>
 
-            <div style={{ display: 'flex', flex: 1 }}>
-                <div style={{ flex: selectedLog ? '0 0 70%' : '1', height: '100%' }}>
+            <div style={{display: 'flex', flex: 1}}>
+                <div style={{flex: selectedLog ? '0 0 70%' : '1', height: '100%'}}>
                     <ReactFlow
                         nodes={nodes} edges={edges} onNodesChange={onNodesChange}
                         onEdgesChange={onEdgesChange} onConnect={onConnect} nodeTypes={nodeTypes}
-                        fitView fitViewOptions={{ padding: 0.2 }}
+                        fitView fitViewOptions={{padding: 0.2}}
                     >
-                        <Controls />
-                        <MiniMap />
-                        <Background variant="dots" gap={12} size={1} />
+                        <Controls/>
+                        <MiniMap/>
+                        <Background variant="dots" gap={12} size={1}/>
                     </ReactFlow>
                 </div>
 
@@ -474,19 +515,25 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                         flex: '0 0 30%', background: 'white', borderLeft: '1px solid var(--color-border)',
                         padding: '24px', overflowY: 'auto'
                     }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                            <h3 style={{ margin: 0 }}>Log Details</h3>
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: '16px'
+                        }}>
+                            <h3 style={{margin: 0}}>Log Details</h3>
                             <button onClick={() => setSelectedLog(null)}
-                                    style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer' }}>×</button>
+                                    style={{background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer'}}>×
+                            </button>
                         </div>
 
-                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                        <div className="detail-section" style={{marginBottom: '16px'}}>
                             <strong>ID:</strong> {selectedLog.id}
                         </div>
-                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                        <div className="detail-section" style={{marginBottom: '16px'}}>
                             <strong>Parent ID:</strong> {selectedLog.parentLogId || 'ROOT'}
                         </div>
-                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                        <div className="detail-section" style={{marginBottom: '16px'}}>
                             <strong>Type:</strong>
                             <span style={{
                                 marginLeft: '8px', padding: '2px 6px', borderRadius: '4px',
@@ -494,10 +541,10 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                                 background: getNodeColor(selectedLog.logType)
                             }}>{selectedLog.logType}</span>
                         </div>
-                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                        <div className="detail-section" style={{marginBottom: '16px'}}>
                             <strong>Timestamp:</strong> {new Date(selectedLog.timestamp).toLocaleString()}
                         </div>
-                        <div className="detail-section" style={{ marginBottom: '16px' }}>
+                        <div className="detail-section" style={{marginBottom: '16px'}}>
                             <strong>Message:</strong>
                             <div style={{
                                 marginTop: '4px', padding: '8px', background: '#f8fafc',
@@ -510,12 +557,12 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                         {selectedLog.referencedBlock && (
                             <div className="detail-section">
                                 <strong>Referenced Block:</strong>
-                                <div style={{ marginTop: '8px' }}>
+                                <div style={{marginTop: '8px'}}>
                                     <div style={{
                                         background: 'white', border: '1px solid var(--color-border)',
                                         padding: '16px', borderRadius: '8px'
                                     }}>
-                                        <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px' }}>
+                                        <div style={{fontWeight: 'bold', fontSize: '14px', marginBottom: '8px'}}>
                                             {selectedLog.referencedBlock.name}
                                         </div>
                                         <div><strong>ID:</strong> {selectedLog.referencedBlock.id}</div>
