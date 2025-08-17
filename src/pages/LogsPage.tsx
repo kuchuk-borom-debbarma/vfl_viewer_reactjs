@@ -31,7 +31,7 @@ const getNodeId = (log: LogEntry): string => log.parentLogId === null ? "ROOT" :
 
 // Custom Node Component
 const LogNode = ({ data }: { data: any }) => {
-    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading, isLatestInBranch } = data;
+    const { log, onExpand, onSelect, canExpandChildren, canExpandSiblings, isLoading, isLatestInBranch, isLatestSibling } = data;
 
     return (
         <>
@@ -72,7 +72,7 @@ const LogNode = ({ data }: { data: any }) => {
                             {isLoading ? '⏳' : '↓'}
                         </button>
                     )}
-                    {canExpandSiblings && (
+                    {canExpandSiblings && isLatestSibling && (
                         <button onClick={(e) => { e.stopPropagation(); onExpand('siblings'); }}
                                 disabled={isLoading} style={{
                             width: '20px', height: '20px', borderRadius: '50%', border: 'none',
@@ -115,6 +115,19 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
 
     const isLatestInBranch = (node: GraphNode): boolean => node.children.length === 0;
 
+    const isLatestSibling = (node: GraphNode, allNodes: Map<string, GraphNode>): boolean => {
+        const siblings = Array.from(allNodes.values()).filter(n =>
+            n.parent?.id === node.parent?.id && n.id !== node.id
+        );
+        if (siblings.length === 0) return true;
+        return siblings.every(sibling => {
+            if (node.log.timestamp !== sibling.log.timestamp) {
+                return node.log.timestamp > sibling.log.timestamp;
+            }
+            return node.log.id > sibling.log.id;
+        });
+    };
+
     const buildNodesAndEdges = (graphNodes: Map<string, GraphNode>) => {
         const reactFlowNodes: Node[] = [], reactFlowEdges: Edge[] = [];
         const processedNodes = new Set<string>();
@@ -129,6 +142,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
             processedNodes.add(nodeId);
 
             const isLatest = isLatestInBranch(node);
+            const isLatestSib = isLatestSibling(node, graphNodes);
 
             reactFlowNodes.push({
                 id: nodeId, type: 'logNode', position: { x, y },
@@ -140,6 +154,7 @@ export default function LogsPage({ blockId, goBack }: { blockId: string; goBack:
                     canExpandSiblings: node.canLoadMoreSiblings,
                     isLoading: node.isLoading,
                     isLatestInBranch: isLatest,
+                    isLatestSibling: isLatestSib,
                 },
             });
 
