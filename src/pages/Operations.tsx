@@ -1,104 +1,85 @@
-// src/pages/Operations.tsx
-// @ts-ignore
-import React, { useEffect, useState } from "react";
-import { CONFIG } from "../config/config";
-import { getRootBlocks, Block } from "../api/vfl";
-import BlockCard from "../components/BlockCard";
+import React, { useEffect } from 'react';
+import { getRootBlocks } from '../api/vfl';
+import { usePagination } from '../hooks/usePagination';
+import { CONFIG } from '../config/config';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import BlockCard from '../components/BlockCard';
+import LoadingSpinner from '../components/ui/LoadingSpinner';
 
-export default function Operations({
-                                     goBack,
-                                     onViewLogs,
-                                   }: {
-  goBack: () => void;
-  onViewLogs: (blockId: string) => void;   // ✅ new prop
-}) {
-  const [blocks, setBlocks] = useState<Block[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
-  const [reachedEnd, setReachedEnd] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+interface OperationsProps {
+    goBack: () => void;
+    onViewLogs: (blockId: string) => void;
+}
 
-  const PAGE_SIZE = CONFIG.DEFAULT_PAGE_SIZE;
+export default function Operations({ goBack, onViewLogs }: OperationsProps) {
+    const {
+        items: blocks,
+        loading,
+        error,
+        hasMore,
+        loadMore,
+        reset,
+        initialize
+    } = usePagination(
+        (cursor) => getRootBlocks(CONFIG.DEFAULT_PAGE_SIZE, cursor),
+        CONFIG.DEFAULT_PAGE_SIZE
+    );
 
-  const fetchBlocks = async (cursor?: string, append = false) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await getRootBlocks(PAGE_SIZE, cursor);
-      setBlocks((prev) => {
-        if (append) {
-          const seen = new Set(prev.map((b) => b.id));
-          const deduped = res.filter((b) => !seen.has(b.id));
-          return [...prev, ...deduped];
-        }
-        return res;
-      });
+    // Initialize data on mount
+    useEffect(() => {
+        initialize();
+    }, []); // Empty dependency array is safe now
 
-      if (res.length > 0) {
-        setNextCursor(res[res.length - 1].cursor);
-        setReachedEnd(res.length < PAGE_SIZE);
-      } else {
-        setReachedEnd(true);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to load blocks.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const handleReset = () => {
+        reset();
+        // Manually load initial data after reset
+        setTimeout(() => initialize(), 0);
+    };
 
-  useEffect(() => {
-    fetchBlocks();
-  }, []);
-
-  const handleLoadMore = () => {
-    if (!reachedEnd && !loading) {
-      fetchBlocks(nextCursor, true);
-    }
-  };
-
-  return (
-      <div className="container section-padding">
-        {goBack && (
-            <button className="btn btn-outline mb-lg" onClick={goBack}>
-              ← Back
-            </button>
-        )}
-        <h2 className="section-title">Operations</h2>
-
-        <div className="features-grid min-height-300">
-          {loading && blocks.length === 0 ? (
-              <div className="grid-full text-center muted">Loading...</div>
-          ) : error ? (
-              <div className="grid-full text-center error">{error}</div>
-          ) : blocks.length === 0 ? (
-              <div className="grid-full text-center muted">No blocks found.</div>
-          ) : (
-              blocks.map((block) => (
-                  <div
-                      key={block.id}
-                      style={{ cursor: "pointer" }}
-                      onClick={() => onViewLogs(block.id)} // ✅ navigate to Logs
-                  >
-                    <BlockCard block={block} />
-                  </div>
-              ))
-          )}
-        </div>
-
-        {reachedEnd ? (
-            <div className="text-center muted mt-lg">No more results.</div>
-        ) : (
-            <div className="flex-center mt-lg">
-              <button
-                  className="btn btn-outline"
-                  onClick={handleLoadMore}
-                  disabled={loading}
-              >
-                {loading ? "Loading..." : "Load More"}
-              </button>
+    return (
+        <div className="page-container">
+            <div className="page-header">
+                <Button variant="outline" onClick={goBack}>
+                    ← Back
+                </Button>
+                <h2 className="page-title">Operations</h2>
             </div>
-        )}
-      </div>
-  );
+
+            <div className="grid-container">
+                {loading && blocks.length === 0 ? (
+                    <div className="grid-full center">
+                        <LoadingSpinner message="Loading blocks..." />
+                    </div>
+                ) : error ? (
+                    <div className="grid-full center error-message">
+                        {error}
+                        <Button variant="outline" onClick={handleReset}>
+                            Retry
+                        </Button>
+                    </div>
+                ) : blocks.length === 0 && !loading ? (
+                    <div className="grid-full center muted">No blocks found.</div>
+                ) : (
+                    blocks.map(block => (
+                        <Card key={block.id} onClick={() => onViewLogs(block.id)}>
+                            <BlockCard block={block} />
+                        </Card>
+                    ))
+                )}
+            </div>
+
+            {blocks.length > 0 && (
+                <div className="pagination-controls">
+                    {hasMore ? (
+                        <Button variant="outline" onClick={() => loadMore()} loading={loading}>
+                            Load More
+                        </Button>
+                    ) : (
+                        <span className="muted">No more results.</span>
+                    )}
+                </div>
+            )}
+        </div>
+    );
 }
