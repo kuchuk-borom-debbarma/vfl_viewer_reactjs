@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useMemo, useCallback} from 'react';
 import {Background, Controls, ReactFlow} from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import LogNode from '../components/LogNode';
@@ -174,7 +174,7 @@ export default function LogsPage({blockId, goBack}: { blockId: string; goBack: (
         setEdges(layoutedEdges);
     };
 
-    const onLoadMoreChildren = async (logEntry: LogEntry) => {
+    const onLoadMoreChildren = useCallback(async (logEntry: LogEntry) => {
         try {
             const logs = await getLogsByBlockId(logEntry.blockId, maxDepth, maxChildren, logEntry.childrenCursor);
             if (!logs || logs.length === 0) {
@@ -185,22 +185,38 @@ export default function LogsPage({blockId, goBack}: { blockId: string; goBack: (
             const created = createFlowFromLogEntries(logs);
 
             // Update nodes and edges
-            const updatedNodes = nodes.map(node =>
-                node.id === logEntry.id
-                    ? { ...node, data: { ...node.data, childrenCursor: null } }
-                    : node
-            );
-            const newNodes = [...updatedNodes, ...created.nodes];
-            const newEdges = [...edges, ...created.edges];
+            setNodes(currentNodes => {
+                const updatedNodes = currentNodes.map(node =>
+                    node.id === logEntry.id
+                        ? { ...node, data: { ...node.data, childrenCursor: null } }
+                        : node
+                );
+                const newNodes = [...updatedNodes, ...created.nodes];
+                return newNodes;
+            });
 
-            // Apply auto-layout to the updated graph
-            applyLayout(newNodes, newEdges);
+            setEdges(currentEdges => {
+                const newEdges = [...currentEdges, ...created.edges];
+                return newEdges;
+            });
+
+            // Apply auto-layout after state updates
+            setTimeout(() => {
+                setNodes(currentNodes => {
+                    setEdges(currentEdges => {
+                        const { nodes: layoutedNodes, edges: layoutedEdges } = applyTreeLayout(currentNodes, currentEdges);
+                        setEdges(layoutedEdges);
+                        return layoutedNodes;
+                    });
+                    return currentNodes;
+                });
+            }, 0);
         } catch (error) {
             console.error("Error loading more children:", error);
         }
-    };
+    }, []);
 
-    const onLoadMoreSiblings = async (logEntry: LogEntry) => {
+    const onLoadMoreSiblings = useCallback(async (logEntry: LogEntry) => {
         try {
             const logs = await getLogsByBlockId(logEntry.blockId, maxDepth, maxChildren, logEntry.siblingCursor);
             if (!logs || logs.length === 0) {
@@ -211,22 +227,39 @@ export default function LogsPage({blockId, goBack}: { blockId: string; goBack: (
             const created = createFlowFromLogEntries(logs);
 
             // Update nodes and edges
-            const updatedNodes = nodes.map(node =>
-                node.id === logEntry.id
-                    ? { ...node, data: { ...node.data, siblingCursor: null } }
-                    : node
-            );
-            const newNodes = [...updatedNodes, ...created.nodes];
-            const newEdges = [...edges, ...created.edges];
+            setNodes(currentNodes => {
+                const updatedNodes = currentNodes.map(node =>
+                    node.id === logEntry.id
+                        ? { ...node, data: { ...node.data, siblingCursor: null } }
+                        : node
+                );
+                const newNodes = [...updatedNodes, ...created.nodes];
+                return newNodes;
+            });
 
-            // Apply auto-layout to the updated graph
-            applyLayout(newNodes, newEdges);
+            setEdges(currentEdges => {
+                const newEdges = [...currentEdges, ...created.edges];
+                return newEdges;
+            });
+
+            // Apply auto-layout after state updates
+            setTimeout(() => {
+                setNodes(currentNodes => {
+                    setEdges(currentEdges => {
+                        const { nodes: layoutedNodes, edges: layoutedEdges } = applyTreeLayout(currentNodes, currentEdges);
+                        setEdges(layoutedEdges);
+                        return layoutedNodes;
+                    });
+                    return currentNodes;
+                });
+            }, 0);
         } catch (error) {
             console.error("Error loading more siblings:", error);
         }
-    };
+    }, []);
 
-    const nodeTypes = {
+    // Memoize nodeTypes to prevent unnecessary re-renders
+    const nodeTypes = useMemo(() => ({
         logNode: (props) => (
             <LogNode
                 {...props}
@@ -234,7 +267,7 @@ export default function LogsPage({blockId, goBack}: { blockId: string; goBack: (
                 onLoadMoreSiblings={onLoadMoreSiblings}
             />
         )
-    };
+    }), [onLoadMoreChildren, onLoadMoreSiblings]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -264,9 +297,9 @@ export default function LogsPage({blockId, goBack}: { blockId: string; goBack: (
     }, [blockId]);
 
     // Manual re-layout button (optional)
-    const handleReLayout = () => {
+    const handleReLayout = useCallback(() => {
         applyLayout(nodes, edges);
-    };
+    }, [nodes, edges, applyLayout]);
 
     if (loading) {
         return (
