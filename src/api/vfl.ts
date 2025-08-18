@@ -1,4 +1,5 @@
-import { CONFIG, getApiUrl } from "../config/config";
+const API_BASE = "http://localhost:8080/api/v1";
+const DEFAULT_LIMIT = 5;
 
 export interface Block {
     id: string;
@@ -22,34 +23,29 @@ export interface LogEntry {
     children: LogEntry[];
 }
 
-async function apiFetch<T>(endpoint: string): Promise<T> {
-    const res = await fetch(getApiUrl(endpoint));
-    if (!res.ok) {
-        throw new Error(`API error: ${res.statusText}`);
-    }
+const apiFetch = async <T>(endpoint: string): Promise<T> => {
+    const res = await fetch(`${API_BASE}${endpoint}`);
+    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
     return res.json();
-}
+};
 
-export async function getRootBlocks(
-    limit: number = CONFIG.DEFAULT_PAGE_SIZE,
-    cursor?: string
-): Promise<Block[]> {
+export const getRootBlocks = (limit = DEFAULT_LIMIT, cursor?: string): Promise<Block[]> => {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<Block[]>(`/root-blocks?${params.toString()}`);
-}
+    return apiFetch<Block[]>(`/root-blocks?${params}`);
+};
 
-export async function getLogsByBlockId(
+export const getLogsByBlockId = (
     blockId: string,
     maxDepth: number,
     maxChildren: number,
     cursor?: string
-): Promise<LogEntry[]> {
+): Promise<LogEntry[]> => {
     const params = new URLSearchParams({
         blockId,
         maxDepth: maxDepth.toString(),
         maxChildren: maxChildren.toString(),
     });
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<LogEntry[]>(`/logs-by-blockid?${params.toString()}`);
-}
+    return apiFetch<LogEntry[]>(`/logs-by-blockid?${params}`);
+};

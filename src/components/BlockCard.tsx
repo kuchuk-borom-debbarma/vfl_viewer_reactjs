@@ -1,71 +1,46 @@
 import React from "react";
 import { Block } from "../api/vfl";
+import { Card } from "./UI";
 
-function formatDuration(start: number, end?: number | null): string {
-    const endTime = end ?? Date.now(); // if still running, measure until now
-    const durationMs = endTime - start;
+const formatDuration = (start: number, end?: number | null): string => {
+    const duration = (end ?? Date.now()) - start;
+    if (duration < 1000) return `${duration}ms`;
 
-    if (durationMs < 1000) return `${durationMs} ms`;
+    const s = Math.floor(duration / 1000) % 60;
+    const m = Math.floor(duration / 60000) % 60;
+    const h = Math.floor(duration / 3600000);
 
-    const secs = Math.floor(durationMs / 1000) % 60;
-    const mins = Math.floor(durationMs / 60000) % 60;
-    const hrs = Math.floor(durationMs / 3600000);
-
-    let parts: string[] = [];
-    if (hrs) parts.push(`${hrs}h`);
-    if (mins) parts.push(`${mins}m`);
-    parts.push(`${secs}s`);
-
-    return parts.join(" ");
-}
+    return [h && `${h}h`, m && `${m}m`, `${s}s`].filter(Boolean).join(" ");
+};
 
 export default function BlockCard({ block }: { block: Block }) {
-    const isOngoing = block.endTime === null;
+    const isOngoing = !block.endTime;
 
     return (
-        <div className="card" style={{ textAlign: "left" }}>
-            {/* Name */}
-            <div
-                className="card-title"
-                style={{ fontSize: "18px", marginBottom: "8px" }}
-            >
+        <Card style={{ textAlign: "left" }}>
+            <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "var(--space)" }}>
                 {block.name}
             </div>
 
-            {/* Metadata */}
-            <div className="card-desc" style={{ lineHeight: 1.6 }}>
-                <div>
-                    <strong>ID:</strong> {block.id}
-                </div>
-                <div>
-                    <strong>Started:</strong>{" "}
-                    {new Date(block.startTime).toLocaleString()}
-                </div>
-                <div>
-                    <strong>Ended:</strong>{" "}
-                    {isOngoing ? "⏳ Ongoing" : new Date(block.endTime!).toLocaleString()}
-                </div>
-                <div>
-                    <strong>Duration:</strong>{" "}
-                    {formatDuration(block.startTime, block.endTime)}
-                </div>
+            <div className="muted" style={{ lineHeight: 1.6, fontSize: "14px" }}>
+                <div><strong>ID:</strong> {block.id}</div>
+                <div><strong>Started:</strong> {new Date(block.startTime).toLocaleString()}</div>
+                <div><strong>Ended:</strong> {isOngoing ? "⏳ Ongoing" : new Date(block.endTime!).toLocaleString()}</div>
+                <div><strong>Duration:</strong> {formatDuration(block.startTime, block.endTime)}</div>
 
                 {block.endMessage && (
-                    <div
-                        style={{
-                            marginTop: 6,
-                            padding: "6px 8px",
-                            background: "#f9fafb",
-                            borderRadius: "6px",
-                            fontStyle: "italic",
-                            color: "var(--color-text-light)",
-                            borderLeft: "3px solid var(--color-primary)",
-                        }}
-                    >
-                        “{block.endMessage}”
+                    <div style={{
+                        marginTop: 6,
+                        padding: "6px 8px",
+                        background: "var(--bg)",
+                        borderRadius: 6,
+                        fontStyle: "italic",
+                        borderLeft: "3px solid var(--primary)"
+                    }}>
+                        "{block.endMessage}"
                     </div>
                 )}
             </div>
-        </div>
+        </Card>
     );
 }
