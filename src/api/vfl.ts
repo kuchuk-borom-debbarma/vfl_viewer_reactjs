@@ -1,38 +1,48 @@
+
+import {Block, LogEntry} from "../types";
+
 const API_BASE = "http://localhost:8080/api/v1";
 const DEFAULT_LIMIT = 5;
 
-export interface Block {
-    id: string;
-    name: string;
-    createdAt: number;
-    startTime: number;
-    endTime: number | null;
-    endMessage: string | null;
-    cursor: string;
-}
+// Debug logging utility
+const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    const style = type === 'REQUEST' ? 'color: blue; font-weight: bold;' :
+        type === 'RESPONSE' ? 'color: green; font-weight: bold;' :
+            'color: red; font-weight: bold;';
 
-export interface LogEntry {
-    id: string;
-    blockId: string;
-    parentLogId: string | null;
-    message: string;
-    logType: string;
-    referencedBlock: any | null;
-    timestamp: number;
-    cursor: string;
-    children: LogEntry[];
-}
+    console.log(`%c[${timestamp}] ${type}: ${endpoint}`, style);
+    if (data) {
+        console.log('Data:', data);
+    }
+};
 
 const apiFetch = async <T>(endpoint: string): Promise<T> => {
-    const res = await fetch(`${API_BASE}${endpoint}`);
-    if (!res.ok) throw new Error(`API error: ${res.statusText}`);
-    return res.json();
+    debugLog('REQUEST', endpoint);
+
+    try {
+        const res = await fetch(`${API_BASE}${endpoint}`);
+
+        if (!res.ok) {
+            const errorText = await res.text();
+            debugLog('ERROR', endpoint, { status: res.status, statusText: res.statusText, error: errorText });
+            throw new Error(`API error: ${res.statusText} - ${errorText}`);
+        }
+
+        const data = await res.json();
+        debugLog('RESPONSE', endpoint, data);
+        return data;
+    } catch (err: any) {
+        debugLog('ERROR', endpoint, err.message);
+        throw err;
+    }
 };
 
 export const getRootBlocks = (limit = DEFAULT_LIMIT, cursor?: string): Promise<Block[]> => {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<Block[]>(`/root-blocks?${params}`);
+    const endpoint = `/root-blocks?${params}`;
+    return apiFetch<Block[]>(endpoint);
 };
 
 export const getLogsByBlockId = (
@@ -47,5 +57,6 @@ export const getLogsByBlockId = (
         maxChildren: maxChildren.toString(),
     });
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<LogEntry[]>(`/logs-by-blockid?${params}`);
+    const endpoint = `/logs-by-blockid?${params}`;
+    return apiFetch<LogEntry[]>(endpoint);
 };

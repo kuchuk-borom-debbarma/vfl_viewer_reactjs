@@ -1,10 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "../components/UI";
 import BlockCard from "../components/BlockCard";
 import { useBlocks } from "../hooks/useBlocks";
+import LogsViewer from "./LogsViewer";
+import {Block} from "../types";
 
 export default function Operations({ goBack }: { goBack: () => void }) {
     const { items: blocks, loading, error, loadMore } = useBlocks();
+    const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
+
+    // Handler for navigating to a referenced block
+    const handleNavigateToBlock = (block: Block) => {
+        setSelectedBlock(block);
+    };
+
+    if (selectedBlock) {
+        return (
+            <LogsViewer
+                block={selectedBlock}
+                goBack={() => setSelectedBlock(null)}
+                onNavigateToBlock={handleNavigateToBlock} // Pass navigation handler
+            />
+        );
+    }
 
     return (
         <div className="container section">
@@ -17,7 +35,15 @@ export default function Operations({ goBack }: { goBack: () => void }) {
                 ) : blocks.length === 0 && loading ? (
                     <div className="text-center muted" style={{ gridColumn: "1/-1" }}>Loading...</div>
                 ) : (
-                    blocks.map(block => <BlockCard key={block.id} block={block} />)
+                    blocks.map(block => (
+                        <div
+                            key={block.id}
+                            onClick={() => setSelectedBlock(block)}
+                            style={{ cursor: "pointer" }}
+                        >
+                            <BlockCard block={block} />
+                        </div>
+                    ))
                 )}
             </div>
 

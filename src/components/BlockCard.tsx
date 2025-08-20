@@ -1,17 +1,7 @@
 import React from "react";
-import { Block } from "../api/vfl";
 import { Card } from "./UI";
-
-const formatDuration = (start: number, end?: number | null): string => {
-    const duration = (end ?? Date.now()) - start;
-    if (duration < 1000) return `${duration}ms`;
-
-    const s = Math.floor(duration / 1000) % 60;
-    const m = Math.floor(duration / 60000) % 60;
-    const h = Math.floor(duration / 3600000);
-
-    return [h && `${h}h`, m && `${m}m`, `${s}s`].filter(Boolean).join(" ");
-};
+import {formatDuration} from "../utils/formatters";
+import {Block} from "../types";
 
 export default function BlockCard({ block }: { block: Block }) {
     const isOngoing = !block.endTime;
