@@ -1,9 +1,16 @@
 import React from "react";
 import { LogEntry } from "../api/vfl";
-import {getLogSymbol} from "../utils/LogUtil";
-import {getTrimmedId, truncate} from "../utils/General";
+import { getLogSymbol } from "../utils/LogUtil";
+import { getTrimmedId, truncate } from "../utils/General";
 
-// ... [keeping all existing functions: getLogSymbol, truncate, getTrimmedId] ...
+function formatDuration(start: number, end?: number | null): string {
+    const duration = (end ?? Date.now()) - start;
+    if (duration < 1000) return `${duration}ms`;
+    const s = Math.floor(duration / 1000) % 60;
+    const m = Math.floor(duration / 60000) % 60;
+    const h = Math.floor(duration / 3600000);
+    return [h && `${h}h`, m && `${m}m`, `${s}s`].filter(Boolean).join(" ");
+}
 
 export function LogCard({
                             log,
@@ -55,8 +62,8 @@ export function LogCard({
                 </span>
             </div>
 
-            {/* Referenced block info - minimal styling */}
-            {hasRef && refBlock && (collapsed || !log.children || log.children.length === 0) && (
+            {/* Always show referenced block info if exists */}
+            {hasRef && refBlock && (
                 <div style={{
                     marginTop: 'var(--space)',
                     padding: 'var(--space)',
@@ -67,29 +74,40 @@ export function LogCard({
                     <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--primary)' }}>
                         Referenced Block
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', marginBottom: 6 }}>
                         <span className="muted">Name:</span>
                         <span>{truncate(refBlock.name || "(none)", 32)}</span>
                         <span className="muted">ID:</span>
                         <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
                             {getTrimmedId(refBlock.id)}
                         </span>
-                        {refBlock.endMessage && (
-                            <>
-                                <span className="muted">Result:</span>
-                                <span style={{ fontStyle: 'italic', color: 'var(--primary)' }}>
-                                    "{truncate(refBlock.endMessage, 48)}"
-                                </span>
-                            </>
-                        )}
+                        <span className="muted">Created at:</span>
+                        <span>{refBlock.createdAt ? new Date(refBlock.createdAt).toLocaleString() : "(unknown)"}</span>
+                        <span className="muted">Duration:</span>
+                        <span>
+                            {formatDuration(refBlock.startTime, refBlock.endTime)}
+                        </span>
+                        <span className="muted">Starting message:</span>
+                        <span>{truncate(log.message || "(no message)", 66)}</span>
                     </div>
-                    <div className="muted" style={{ fontSize: '11px', marginTop: '4px' }}>
-                        Click to {collapsed ? "expand" : "collapse"}
-                    </div>
+                    {/* Ending message, if available */}
+                    {refBlock.endMessage && (
+                        <div style={{
+                            marginTop: 6,
+                            padding: '6px 8px',
+                            background: '#f0f4ff',
+                            borderRadius: 6,
+                            fontStyle: 'italic',
+                            borderLeft: '3px solid var(--primary)',
+                            color: 'var(--primary)'
+                        }}>
+                            {truncate(refBlock.endMessage, 48)}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Referenced logs in minimal style */}
+            {/* Referenced logs in minimal style (expanded view) */}
             {hasRef && !collapsed && log.children && log.children.length > 0 && (
                 <div style={{
                     marginTop: 'var(--space)',
