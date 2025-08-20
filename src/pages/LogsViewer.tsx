@@ -1,188 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Button, LoadingState } from "../components/UI";
-import { getLogsByBlockId, LogEntry, Block } from "../api/vfl";
-import { getLogSymbol } from "../utils/LogUtil";
-import { getTrimmedId, truncate } from "../utils/General";
+import React, {useEffect, useRef, useState} from "react";
+import {Button, LoadingState} from "../components/UI";
+import {Block, getLogsByBlockId, LogEntry} from "../api/vfl";
 import BlockSidebar from "../components/BlockSidebar";
 import ControlsBar from "../components/ControlsBar";
-
-const formatDuration = (start: number, end?: number | null) => {
-    const ms = (end ?? Date.now()) - start;
-    if (ms < 1000) return `${ms}ms`;
-    const s = Math.floor(ms / 1000) % 60, m = Math.floor(ms / 60000) % 60, h = Math.floor(ms / 3600000);
-    return [h && `${h}h`, m && `${m}m`, `${s}s`].filter(Boolean).join(" ");
-};
-
-function LogCard({
-                     log,
-                     collapsed,
-                     loadingReferenced,
-                     onToggleExpand,
-                     onNavigateToBlock
-                 }: {
-    log: LogEntry;
-    collapsed: boolean;
-    loadingReferenced: boolean;
-    onToggleExpand?: () => void;
-    onNavigateToBlock?: (block: Block) => void;
-}) {
-    const { referencedBlock: ref } = log;
-
-    const handleExpandClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (ref && onToggleExpand) {
-            onToggleExpand();
-        }
-    };
-
-    const handleBlockCardClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (ref && onNavigateToBlock) {
-            onNavigateToBlock(ref);
-        }
-    };
-
-    return (
-        <div style={{ marginBottom: 'var(--space)' }}>
-            {/* Main Log Row */}
-            <div
-                className="card"
-                style={{
-                    background: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    transition: 'all 0.2s ease'
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: 'var(--space)' }}>
-                    {ref && (
-                        <button
-                            onClick={handleExpandClick}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--primary)',
-                                fontSize: 12,
-                                cursor: 'pointer',
-                                padding: '4px',
-                                borderRadius: '4px',
-                                transition: 'all 0.2s ease',
-                                transform: !collapsed ? 'rotate(90deg)' : 'rotate(0deg)',
-                            }}
-                            title={collapsed ? "Expand referenced block logs" : "Collapse referenced block logs"}
-                        >
-                            {loadingReferenced ? "⏳" : "▶"}
-                        </button>
-                    )}
-                    <span style={{ fontSize: 16 }}>{getLogSymbol(log)}</span>
-                    <span className="muted" style={{ fontSize: 11, fontFamily: "monospace" }}>
-                        {getTrimmedId(log.id)}
-                    </span>
-                    <span style={{ fontWeight: 500, flex: 1 }}>
-                        {truncate(log.message || "(no message)", 60)}
-                    </span>
-                    <span className="muted" style={{ fontSize: 12 }}>
-                        {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ""}
-                    </span>
-                </div>
-            </div>
-
-            {/* Referenced Block Card - Clickable to Navigate */}
-            {ref && (
-                <div
-                    className="card clickable"
-                    onClick={handleBlockCardClick}
-                    style={{
-                        marginTop: 'var(--space)',
-                        background: '#eff6ff',
-                        border: '2px solid var(--primary)',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease'
-                    }}
-                >
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 'var(--space)'
-                    }}>
-                        <div style={{
-                            fontWeight: 600,
-                            color: 'var(--primary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            Referenced Block
-                            <span style={{
-                                background: 'var(--primary)',
-                                color: 'white',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                fontSize: '10px',
-                                fontWeight: '500'
-                            }}>
-                                Click to view
-                            </span>
-                        </div>
-                        <span style={{
-                            color: 'var(--text-light)',
-                            fontSize: '12px'
-                        }}>
-                            →
-                        </span>
-                    </div>
-
-                    <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '8px' }}>
-                        {ref.name}
-                    </div>
-
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'auto 1fr',
-                        gap: '4px 12px',
-                        fontSize: '13px',
-                        marginBottom: '8px'
-                    }}>
-                        <span className="muted">ID:</span>
-                        <span style={{ fontFamily: 'monospace', fontSize: 12 }}>
-                            {getTrimmedId(ref.id)}
-                        </span>
-
-                        <span className="muted">Created:</span>
-                        <span>
-                            {ref.createdAt ? new Date(ref.createdAt).toLocaleString() : "(unknown)"}
-                        </span>
-
-                        <span className="muted">Duration:</span>
-                        <span>{formatDuration(ref.startTime, ref.endTime)}</span>
-
-                        <span className="muted">Status:</span>
-                        <span style={{
-                            color: ref.endTime ? '#059669' : '#d97706',
-                            fontWeight: '500'
-                        }}>
-                            {ref.endTime ? '✅ Completed' : '⏳ Running'}
-                        </span>
-                    </div>
-
-                    {ref.endMessage && (
-                        <div style={{
-                            padding: '6px 8px',
-                            background: '#f0f4ff',
-                            borderRadius: '6px',
-                            fontStyle: 'italic',
-                            borderLeft: '3px solid var(--primary)',
-                            color: 'var(--primary)',
-                            fontSize: '12px'
-                        }}>
-                            💬 {truncate(ref.endMessage, 60)}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
+import {LogCard} from "../components/LogCard";
 
 export default function LogsViewer({
                                        block,
@@ -199,15 +20,17 @@ export default function LogsViewer({
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
     const [loadingReferencedBlocks, setLoadingReferencedBlocks] = useState<Set<string>>(new Set());
     const [zoom, setZoom] = useState(1);
-    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [pan, setPan] = useState({x: 0, y: 0});
     const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [dragStart, setDragStart] = useState({x: 0, y: 0});
     const [inputMode, setInputMode] = useState<"mouse" | "trackpad">("mouse");
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const canvasRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => { loadLogs(); }, [block.id]);
+    useEffect(() => {
+        loadLogs();
+    }, [block.id]);
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -219,7 +42,7 @@ export default function LogsViewer({
                     const delta = e.deltaY > 0 ? -0.1 : 0.1;
                     setZoom(prev => Math.min(Math.max(prev + delta, 0.1), 3));
                 } else {
-                    setPan(prev => ({ ...prev, y: prev.y - e.deltaY }));
+                    setPan(prev => ({...prev, y: prev.y - e.deltaY}));
                 }
             } else if (inputMode === "trackpad") {
                 if (e.ctrlKey || e.metaKey) {
@@ -233,7 +56,7 @@ export default function LogsViewer({
                 }
             }
         };
-        canvas.addEventListener('wheel', handleWheel, { passive: false });
+        canvas.addEventListener('wheel', handleWheel, {passive: false});
         return () => canvas.removeEventListener('wheel', handleWheel);
     }, [inputMode]);
 
@@ -284,9 +107,9 @@ export default function LogsViewer({
             setLogs(prev => {
                 const updateLogWithChildren = (logEntry: LogEntry): LogEntry => {
                     if (logEntry.id === log.id)
-                        return { ...logEntry, children: referencedLogs };
+                        return {...logEntry, children: referencedLogs};
                     if (logEntry.children?.length)
-                        return { ...logEntry, children: logEntry.children.map(updateLogWithChildren) };
+                        return {...logEntry, children: logEntry.children.map(updateLogWithChildren)};
                     return logEntry;
                 };
                 return prev.map(updateLogWithChildren);
@@ -315,7 +138,7 @@ export default function LogsViewer({
         }
     };
 
-    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root") => {
+    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number) => {
         if (!logs || logs.length === 0) return null;
         const result: JSX.Element[] = [];
 
@@ -324,21 +147,25 @@ export default function LogsViewer({
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
             const hasNextSibling = i < logs.length - 1;
 
+            // Use the previous log's timestamp as parent, or the passed parentTimestamp
+            const currentParentTimestamp = i > 0 ? logs[i - 1].timestamp : parentTimestamp;
+
             const sequentialConnector = hasNextSibling ? (
                 <div key={`connector-${log.id}`} style={{
                     width: '2px', height: '8px', background: 'var(--border)',
                     margin: '4px 0 4px 12px', borderRadius: '1px'
-                }} />
+                }}/>
             ) : null;
 
             result.push(
-                <div key={`${keyPrefix}-${i}`} style={{ position: 'relative' }}>
+                <div key={`${keyPrefix}-${i}`} style={{position: 'relative'}}>
                     <LogCard
                         log={log}
                         collapsed={isCollapsed}
                         loadingReferenced={isLoadingReferenced}
                         onToggleExpand={() => log.referencedBlock && handleExpandReferencedBlock(log)}
                         onNavigateToBlock={onNavigateToBlock}
+                        parentTimestamp={currentParentTimestamp} // Pass parent timestamp for duration calculation
                     />
                 </div>
             );
@@ -359,14 +186,15 @@ export default function LogsViewer({
                             opacity: 0.95
                         }}
                     >
-                        {renderLogStructure(log.children, depth + 1, `${keyPrefix}-ref-${log.id}`)}
+                        {/* Pass the current log's timestamp as parent for nested logs */}
+                        {renderLogStructure(log.children, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
                     </div>
                 );
             }
 
             if (!log.referencedBlock && Array.isArray(log.children) && log.children.length > 1) {
                 result.push(
-                    <div key={`${log.id}-parallels`} style={{ margin: 'calc(var(--space) * 2) 0' }}>
+                    <div key={`${log.id}-parallels`} style={{margin: 'calc(var(--space) * 2) 0'}}>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -375,9 +203,19 @@ export default function LogsViewer({
                             fontSize: '12px',
                             fontWeight: '500'
                         }}>
-                            <div style={{ width: '20px', height: '1px', background: 'var(--border)', marginRight: 'var(--space)' }} />
+                            <div style={{
+                                width: '20px',
+                                height: '1px',
+                                background: 'var(--border)',
+                                marginRight: 'var(--space)'
+                            }}/>
                             Parallel Execution
-                            <div style={{ flex: 1, height: '1px', background: 'var(--border)', marginLeft: 'var(--space)' }} />
+                            <div style={{
+                                flex: 1,
+                                height: '1px',
+                                background: 'var(--border)',
+                                marginLeft: 'var(--space)'
+                            }}/>
                         </div>
                         <div className="grid" style={{
                             gridTemplateColumns: `repeat(${log.children.length}, 1fr)`,
@@ -404,8 +242,9 @@ export default function LogsViewer({
                                     }}>
                                         Branch {idx + 1}
                                     </div>
-                                    <div style={{ marginTop: 'var(--space)' }}>
-                                        {renderLogStructure([parallelLog], depth, `${keyPrefix}-${log.id}-parallel-${idx}`)}
+                                    <div style={{marginTop: 'var(--space)'}}>
+                                        {/* Pass current log's timestamp as parent for parallel branches */}
+                                        {renderLogStructure([parallelLog], depth, `${keyPrefix}-${log.id}-parallel-${idx}`, log.timestamp)}
                                     </div>
                                 </div>
                             ))}
@@ -425,10 +264,11 @@ export default function LogsViewer({
                             <div style={{
                                 width: '12px', height: '1px',
                                 background: 'var(--border)', marginRight: '4px'
-                            }} />
+                            }}/>
                             ⬇️
                         </div>
-                        {renderLogStructure(log.children, depth, `${keyPrefix}-${log.id}-seq`)}
+                        {/* Pass current log's timestamp as parent for sequential children */}
+                        {renderLogStructure(log.children, depth, `${keyPrefix}-${log.id}-seq`, log.timestamp)}
                     </div>
                 );
             }
@@ -438,24 +278,26 @@ export default function LogsViewer({
 
         return <>{result}</>;
     };
-
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
         e.stopPropagation();
         setIsDragging(true);
-        setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+        setDragStart({x: e.clientX - pan.x, y: e.clientY - pan.y});
     };
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDragging) {
             e.stopPropagation();
-            setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+            setPan({x: e.clientX - dragStart.x, y: e.clientY - dragStart.y});
         }
     };
     const handleMouseUp = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsDragging(false);
     };
-    const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
+    const resetView = () => {
+        setZoom(1);
+        setPan({x: 0, y: 0});
+    };
     const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
     const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.1));
     const expandAll = () => setCollapsed(new Set());
@@ -481,7 +323,7 @@ export default function LogsViewer({
                 <div className="container">
                     <Button variant="outline" className="mb" onClick={goBack}>← Back</Button>
                     <h2 className="section-title">Loading logs for {block.name}</h2>
-                    <LoadingState message="Loading execution logs..." />
+                    <LoadingState message="Loading execution logs..."/>
                 </div>
             </div>
         );
@@ -529,7 +371,7 @@ export default function LogsViewer({
                     alignItems: 'center',
                     gap: 'var(--space)'
                 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                         <Button variant="outline" onClick={goBack}>← Back</Button>
                         <button
                             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -624,7 +466,7 @@ export default function LogsViewer({
                     flexWrap: 'wrap',
                     gap: 'var(--space)'
                 }}>
-                    <div style={{ display: 'flex', gap: 'calc(var(--space) * 3)' }}>
+                    <div style={{display: 'flex', gap: 'calc(var(--space) * 3)'}}>
                         <span>Referenced Block</span>
                         <span>Parallel Execution</span>
                         <span>⬇️ Sequential Flow</span>
