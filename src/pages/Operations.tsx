@@ -3,7 +3,7 @@ import { Button } from "../components/UI";
 import BlockCard from "../components/BlockCard";
 import { useBlocks } from "../hooks/useBlocks";
 import LogsViewer from "./LogsViewer";
-import { Block } from "../api/vfl";
+import {Block} from "../types";
 
 export default function Operations({ goBack }: { goBack: () => void }) {
     const { items: blocks, loading, error, loadMore } = useBlocks();

@@ -1,9 +1,10 @@
 import React, {useEffect, useRef, useState} from "react";
 import {Button, LoadingState} from "../components/UI";
-import {Block, getLogsByBlockId, LogEntry} from "../api/vfl";
 import BlockSidebar from "../components/BlockSidebar";
 import ControlsBar from "../components/ControlsBar";
 import {LogCard} from "../components/LogCard";
+import {Block, LogEntry} from "../types";
+import {getLogsByBlockId} from "../api/vfl";
 
 export default function LogsViewer({
                                        block,

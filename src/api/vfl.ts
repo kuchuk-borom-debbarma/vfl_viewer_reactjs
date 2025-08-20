@@ -1,27 +1,7 @@
+import {Block, LogEntry} from "../types";
+
 const API_BASE = "http://localhost:8080/api/v1";
 const DEFAULT_LIMIT = 5;
-
-export interface Block {
-    id: string;
-    name: string;
-    createdAt: number;
-    startTime: number;
-    endTime: number | null;
-    endMessage: string | null;
-    cursor: string;
-}
-
-export interface LogEntry {
-    id: string;
-    blockId: string;
-    parentLogId: string | null;
-    message: string;
-    logType: string;
-    referencedBlock: any | null;
-    timestamp: number;
-    cursor: string;
-    children: LogEntry[];
-}
 
 const apiFetch = async <T>(endpoint: string): Promise<T> => {
     const res = await fetch(`${API_BASE}${endpoint}`);
