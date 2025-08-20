@@ -180,52 +180,6 @@ function LogCard({
                     )}
                 </div>
             )}
-
-            {/* Referenced block logs - only children not matching current log */}
-            {ref && !collapsed && log.children && log.children.length > 0 && (
-                <div style={{
-                    marginTop: 'var(--space)',
-                    marginLeft: 'calc(var(--space) * 2)',
-                    paddingLeft: 'var(--space)',
-                    borderLeft: '2px solid var(--primary)',
-                    background: 'rgba(37, 99, 235, 0.02)',
-                    borderRadius: '0 8px 8px 0'
-                }}>
-                    <div style={{
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: 'var(--primary)',
-                        marginBottom: 'var(--space)',
-                        padding: '4px 0'
-                    }}>
-                        Referenced Block Execution Logs
-                    </div>
-                    {log.children.filter(l => l.id !== log.id).map((refLog, idx) =>
-                        <div key={refLog.id || idx} style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 'var(--space)',
-                            padding: '6px 8px',
-                            margin: '4px 0',
-                            background: 'var(--surface)',
-                            border: '1px solid var(--border)',
-                            borderRadius: '6px',
-                            fontSize: 13
-                        }}>
-                            <span>{getLogSymbol(refLog)}</span>
-                            <span className="muted" style={{ fontFamily: 'monospace', fontSize: 10 }}>
-                                {getTrimmedId(refLog.id)}
-                            </span>
-                            <span style={{ flex: 1 }}>
-                                {truncate(refLog.message || "(no message)", 50)}
-                            </span>
-                            <span className="muted" style={{ fontSize: 11 }}>
-                                {refLog.timestamp ? new Date(refLog.timestamp).toLocaleTimeString() : ""}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            )}
         </div>
     );
 }
@@ -391,6 +345,7 @@ export default function LogsViewer({
 
             if (hasNextSibling && !log.children?.length) result.push(sequentialConnector);
 
+            // FIXED: Only show nested logs for referenced blocks when expanded, no duplicate header
             if (log.referencedBlock && log.children?.length > 0 && !isCollapsed) {
                 result.push(
                     <div
@@ -597,7 +552,7 @@ export default function LogsViewer({
                             }}
                             title={sidebarOpen ? "Hide block info" : "Show block info"}
                         >
-                            {sidebarOpen ? '⮌' : 'ℹ️'}
+                            {sidebarOpen ? '◀' : 'ℹ️'}
                         </button>
                         <h2 style={{
                             fontSize: '24px',
