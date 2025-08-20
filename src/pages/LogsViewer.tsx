@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button, LoadingState } from "../components/UI";
-import { getLogsByBlockId, LogEntry } from "../api/vfl";
+import { getLogsByBlockId, LogEntry, Block } from "../api/vfl";
 import { LogCard } from "../components/LogCard";
+import BlockSidebar from "../components/BlockSidebar";
+import ControlsBar from "../components/ControlsBar";
 
-export default function LogsViewer({ blockId, blockName, goBack }) {
+export default function LogsViewer({ block, goBack }: {
+    block: Block;
+    goBack: () => void
+}) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -13,14 +18,14 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-    const [inputMode, setInputMode] = useState<"mouse" | "trackpad">("mouse"); // NEW
+    const [inputMode, setInputMode] = useState<"mouse" | "trackpad">("mouse");
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const canvasRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         loadLogs();
-        // eslint-disable-next-line
-    }, [blockId]);
+    }, [block.id]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -28,22 +33,20 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
 
         const handleWheel = (e: WheelEvent) => {
             e.preventDefault();
+            e.stopPropagation(); // Prevent triggering log expansion
+
             if (inputMode === "mouse") {
                 if (e.ctrlKey || e.metaKey) {
-                    // Mouse users (with ctrl/cmd): zoom
                     const delta = e.deltaY > 0 ? -0.1 : 0.1;
                     setZoom(prev => Math.min(Math.max(prev + delta, 0.1), 3));
                 } else {
-                    // Mouse wheel: pan vertically
                     setPan(prev => ({ ...prev, y: prev.y - e.deltaY }));
                 }
             } else if (inputMode === "trackpad") {
                 if (e.ctrlKey || e.metaKey) {
-                    // Trackpad pinch-to-zoom: smaller increments
                     const delta = e.deltaY > 0 ? -0.04 : 0.04;
                     setZoom(prev => Math.min(Math.max(prev + delta, 0.1), 3));
                 } else {
-                    // Trackpad: smooth x/y panning
                     setPan(prev => ({
                         x: prev.x - e.deltaX,
                         y: prev.y - e.deltaY
@@ -60,7 +63,7 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
         setLoading(true);
         setError(null);
         try {
-            const logsData = await getLogsByBlockId(blockId, 10, 50);
+            const logsData = await getLogsByBlockId(block.id, 10, 50);
             setLogs(logsData);
             initializeCollapsedState(logsData);
         } catch (err: any) {
@@ -100,10 +103,12 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
 
     const handleExpandReferencedBlock = async (log: LogEntry) => {
         if (!log.referencedBlock) return;
+
         if (!collapsed.has(log.id) && log.children?.length > 0) {
             toggleCollapse(log.id);
             return;
         }
+
         setLoadingReferencedBlocks(prev => new Set([...prev, log.id]));
         try {
             const referencedLogs = await getLogsByBlockId(log.referencedBlock.id, 10, 50);
@@ -113,12 +118,16 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                         return { ...logEntry, children: referencedLogs };
                     }
                     if (logEntry.children?.length) {
-                        return { ...logEntry, children: logEntry.children.map(updateLogWithChildren) };
+                        return {
+                            ...logEntry,
+                            children: logEntry.children.map(updateLogWithChildren)
+                        };
                     }
                     return logEntry;
                 };
                 return prev.map(updateLogWithChildren);
             });
+
             const newReferencedBlocks = new Set<string>();
             const findNewReferencedBlocks = (entries: LogEntry[]) => {
                 entries.forEach(entry => {
@@ -127,6 +136,7 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                 });
             };
             findNewReferencedBlocks(referencedLogs);
+
             setCollapsed(prev => {
                 const updated = new Set([...prev, ...newReferencedBlocks]);
                 updated.delete(log.id);
@@ -145,17 +155,20 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
 
     const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root") => {
         if (!logs || logs.length === 0) return null;
+
         const result: JSX.Element[] = [];
         logs.forEach((log, i) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
             const hasNextSibling = i < logs.length - 1;
+
             const sequentialConnector = hasNextSibling ? (
                 <div key={`connector-${log.id}`} style={{
                     width: '2px', height: '8px', background: 'var(--border)',
                     margin: '4px 0 4px 12px', borderRadius: '1px'
                 }} />
             ) : null;
+
             result.push(
                 <div key={`${keyPrefix}-${i}`} style={{ position: 'relative' }}>
                     <LogCard
@@ -166,7 +179,9 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                     />
                 </div>
             );
+
             if (hasNextSibling && !log.children?.length) result.push(sequentialConnector);
+
             if (log.referencedBlock && log.children?.length > 0 && !isCollapsed) {
                 result.push(
                     <div
@@ -184,6 +199,7 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                     </div>
                 );
             }
+
             if (!log.referencedBlock && Array.isArray(log.children) && log.children.length > 1) {
                 result.push(
                     <div key={`${log.id}-parallels`} style={{ margin: 'calc(var(--space) * 2) 0' }}>
@@ -196,11 +212,13 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                             fontWeight: '500'
                         }}>
                             <div style={{
-                                width: '20px', height: '1px', background: 'var(--border)', marginRight: 'var(--space)'
+                                width: '20px', height: '1px',
+                                background: 'var(--border)', marginRight: 'var(--space)'
                             }} />
-                            Parallel Execution
+                            🔀 Parallel Execution
                             <div style={{
-                                flex: 1, height: '1px', background: 'var(--border)', marginLeft: 'var(--space)'
+                                flex: 1, height: '1px',
+                                background: 'var(--border)', marginLeft: 'var(--space)'
                             }} />
                         </div>
                         <div className="grid" style={{
@@ -219,14 +237,14 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                                         position: 'absolute',
                                         top: '-8px',
                                         left: 'var(--space)',
-                                        background: 'var(--primary)',
+                                        background: '#f59e0b',
                                         color: 'white',
                                         padding: '2px 8px',
                                         borderRadius: '4px',
                                         fontSize: '10px',
                                         fontWeight: '600'
                                     }}>
-                                        Branch {idx + 1}
+                                        🌿 Branch {idx + 1}
                                     </div>
                                     <div style={{ marginTop: 'var(--space)' }}>
                                         {renderLogStructure([parallelLog], depth, `${keyPrefix}-${log.id}-parallel-${idx}`)}
@@ -252,36 +270,46 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                                 background: 'var(--border)',
                                 marginRight: '4px'
                             }} />
-                            ↓
+                            ⬇️
                         </div>
                         {renderLogStructure(log.children, depth, `${keyPrefix}-${log.id}-seq`)}
                     </div>
                 );
             }
+
             if (hasNextSibling && log.children?.length) result.push(sequentialConnector);
         });
+
         return <>{result}</>;
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
+        e.stopPropagation();
         setIsDragging(true);
         setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     };
+
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDragging) {
+            e.stopPropagation();
             setPan({
                 x: e.clientX - dragStart.x,
                 y: e.clientY - dragStart.y
             });
         }
     };
-    const handleMouseUp = () => setIsDragging(false);
+
+    const handleMouseUp = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsDragging(false);
+    };
 
     const resetView = () => {
         setZoom(1);
         setPan({ x: 0, y: 0 });
     };
+
     const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
     const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.1));
     const expandAll = () => setCollapsed(new Set());
@@ -306,12 +334,13 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
             }}>
                 <div className="container">
                     <Button variant="outline" className="mb" onClick={goBack}>← Back</Button>
-                    <h2 className="section-title">Loading logs for {blockName}</h2>
+                    <h2 className="section-title">Loading logs for {block.name}</h2>
                     <LoadingState message="Loading execution logs..." />
                 </div>
             </div>
         );
     }
+
     if (error) {
         return (
             <div style={{
@@ -335,8 +364,31 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
             display: 'flex',
             flexDirection: 'column'
         }}>
-            <div className="container" style={{ paddingTop: 'calc(var(--space) * 3)', paddingBottom: 'calc(var(--space) * 2)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'calc(var(--space) * 2)' }}>
+            {/* Block Sidebar */}
+            <BlockSidebar
+                block={block}
+                isOpen={sidebarOpen}
+                onToggle={() => setSidebarOpen(!sidebarOpen)}
+            />
+
+            {/* Header with Controls */}
+            <div
+                className="container"
+                style={{
+                    paddingTop: 'calc(var(--space) * 3)',
+                    paddingBottom: 'calc(var(--space) * 2)',
+                    marginLeft: sidebarOpen ? '300px' : '0',
+                    transition: 'margin-left 0.3s ease'
+                }}
+            >
+                <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    marginBottom: 'calc(var(--space) * 2)',
+                    flexWrap: 'wrap',
+                    gap: 'var(--space)'
+                }}>
                     <div>
                         <Button variant="outline" onClick={goBack}>← Back</Button>
                         <h2 style={{
@@ -345,37 +397,33 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                             margin: 'calc(var(--space) * 2) 0 var(--space)',
                             color: 'var(--text)'
                         }}>
-                            Execution Flow: <span className="highlight">{blockName}</span>
+                            🔄 Execution Flow: <span className="highlight">{block.name}</span>
                         </h2>
                     </div>
-                    <div style={{ display: 'flex', gap: 'var(--space)', alignItems: 'center' }}>
-                        <Button variant="outline" onClick={expandAll}>Expand All</Button>
-                        <Button variant="outline" onClick={collapseAll}>Collapse All</Button>
-                        <Button variant="outline" onClick={zoomOut}>Zoom Out</Button>
-                        <Button variant="outline" onClick={zoomIn}>Zoom In</Button>
-                        <span className="muted" style={{ fontSize: '14px' }}>
-                            {(zoom * 100).toFixed(0)}%
-                        </span>
-                        <Button onClick={resetView}>Reset View</Button>
-                    </div>
-                </div>
-                {/* INPUT MODE TOGGLE */}
-                <div style={{ marginBottom: 'var(--space)' }}>
-                    <label style={{ fontWeight: 500, marginRight: 8 }}>Input Mode:</label>
-                    <select value={inputMode} onChange={e => setInputMode(e.target.value as "mouse" | "trackpad")}>
-                        <option value="mouse">Mouse</option>
-                        <option value="trackpad">Trackpad</option>
-                    </select>
+
+                    <ControlsBar
+                        zoom={zoom}
+                        onZoomIn={zoomIn}
+                        onZoomOut={zoomOut}
+                        onResetView={resetView}
+                        onExpandAll={expandAll}
+                        onCollapseAll={collapseAll}
+                        inputMode={inputMode}
+                        onInputModeChange={setInputMode}
+                    />
                 </div>
             </div>
 
+            {/* Main Canvas */}
             <div
                 ref={canvasRef}
                 style={{
                     flex: 1,
                     overflow: 'hidden',
                     cursor: isDragging ? 'grabbing' : 'grab',
-                    position: 'relative'
+                    position: 'relative',
+                    marginLeft: sidebarOpen ? '300px' : '0',
+                    transition: 'margin-left 0.3s ease'
                 }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -398,25 +446,31 @@ export default function LogsViewer({ blockId, blockName, goBack }) {
                     </div>
                 </div>
             </div>
+
+            {/* Footer */}
             <div style={{
                 borderTop: '1px solid var(--border)',
                 padding: 'var(--space) 0',
                 background: 'var(--surface)',
                 fontSize: '12px',
-                color: 'var(--text-light)'
+                color: 'var(--text-light)',
+                marginLeft: sidebarOpen ? '300px' : '0',
+                transition: 'margin-left 0.3s ease'
             }}>
                 <div className="container" style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 'var(--space)'
                 }}>
                     <div style={{ display: 'flex', gap: 'calc(var(--space) * 3)' }}>
-                        <span><span style={{ color: 'var(--primary)' }}>●</span> Referenced Block</span>
-                        <span><span style={{ color: '#f59e0b' }}>●</span> Parallel Execution</span>
-                        <span>↓ Sequential Flow</span>
+                        <span>🔗 Referenced Block</span>
+                        <span>🔀 Parallel Execution</span>
+                        <span>⬇️ Sequential Flow</span>
                     </div>
                     <div>
-                        💡 Ctrl/Cmd + scroll to zoom • Drag to pan
+                        💡 Ctrl/Cmd + scroll to zoom • Drag to pan • Click cards to expand
                     </div>
                 </div>
             </div>

@@ -319,3 +319,79 @@ body {
 .log-entry.referenced {
     border-color: rgba(59, 130, 246, 0.4);
 }
+/* Sidebar specific styles */
+.sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.1);
+    z-index: 999;
+    transition: opacity 0.3s ease;
+}
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 300px;
+    height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    overflow-y: auto;
+    box-shadow: 4px 0 12px rgba(0,0,0,0.1);
+}
+
+.sidebar.closed {
+    transform: translateX(-100%);
+}
+
+/* Control button styles */
+.control-btn-group {
+    display: flex;
+    gap: var(--space);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.control-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
+/* Improved card interactions */
+.card.clickable {
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.card.clickable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.card.clickable:active {
+    transform: translateY(0);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 280px;
+    }
+
+    .control-btn-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .control-btn-group > * {
+        flex: 1;
+        min-width: auto;
+    }
+}
