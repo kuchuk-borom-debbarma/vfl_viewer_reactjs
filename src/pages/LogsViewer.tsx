@@ -46,6 +46,8 @@ export default function LogsViewer({blockId, blockName, goBack}) {
         return () => canvas.removeEventListener('wheel', handleWheel);
     }, []);
 
+    // ... [keeping all the existing logic functions: loadLogs, initializeCollapsedState, toggleCollapse, handleExpandReferencedBlock] ...
+
     const loadLogs = async () => {
         setLoading(true);
         setError(null);
@@ -143,6 +145,7 @@ export default function LogsViewer({blockId, blockName, goBack}) {
         }
     };
 
+    // Redesigned rendering with minimal aesthetic
     const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root") => {
         if (!logs || logs.length === 0) return null;
         const result: JSX.Element[] = [];
@@ -150,67 +153,154 @@ export default function LogsViewer({blockId, blockName, goBack}) {
         logs.forEach((log, i) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
+            const hasNextSibling = i < logs.length - 1;
 
-            // Render log card (sibling/sequence always same indent)
+            // Sequential flow connector (subtle)
+            const sequentialConnector = hasNextSibling ? (
+                <div key={`connector-${log.id}`} style={{
+                    width: '2px',
+                    height: '8px',
+                    background: 'var(--border)',
+                    margin: '4px 0 4px 12px',
+                    borderRadius: '1px'
+                }} />
+            ) : null;
+
+            // Main log entry
             result.push(
-                <LogCard
-                    key={`${keyPrefix}-${i}`}
-                    log={log}
-                    collapsed={isCollapsed}
-                    loadingReferenced={isLoadingReferenced}
-                    onToggle={() => {
-                        if (log.referencedBlock) handleExpandReferencedBlock(log);
-                    }}
-                />
+                <div key={`${keyPrefix}-${i}`} style={{ position: 'relative' }}>
+                    <LogCard
+                        log={log}
+                        collapsed={isCollapsed}
+                        loadingReferenced={isLoadingReferenced}
+                        onToggle={() => {
+                            if (log.referencedBlock) handleExpandReferencedBlock(log);
+                        }}
+                    />
+                </div>
             );
 
-            // === NESTING ONLY FOR REFERENCED BLOCKS ===
+            // Sequential connector after each log (except last)
+            if (hasNextSibling && !log.children?.length) {
+                result.push(sequentialConnector);
+            }
+
+            // Referenced block nesting (minimal styling)
             if (log.referencedBlock && log.children?.length > 0 && !isCollapsed) {
                 result.push(
                     <div
                         key={`${log.id}-referenced`}
-                        className="referenced-content"
-                        style={{marginLeft: 24}}
+                        style={{
+                            marginLeft: 'calc(var(--space) * 4)',
+                            marginTop: 'var(--space)',
+                            marginBottom: 'var(--space)',
+                            paddingLeft: 'var(--space)',
+                            borderLeft: '2px solid var(--primary)',
+                            opacity: 0.95
+                        }}
                     >
                         {renderLogStructure(log.children, depth + 1, `${keyPrefix}-ref-${log.id}`)}
                     </div>
                 );
             }
 
-            // === PARALLEL: render children as grid/sibling columns (no nesting) ===
-            // If children array > 1, display sibling columns
+            // Parallel execution (clean grid)
             if (!log.referencedBlock && Array.isArray(log.children) && log.children.length > 1) {
                 result.push(
-                    <div
-                        key={`${log.id}-parallels`}
-                        style={{
-                            marginTop: 12,
-                            marginBottom: 12,
-                            display: 'grid',
+                    <div key={`${log.id}-parallels`} style={{ margin: 'calc(var(--space) * 2) 0' }}>
+                        {/* Simple parallel indicator */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            marginBottom: 'var(--space)',
+                            color: 'var(--text-light)',
+                            fontSize: '12px',
+                            fontWeight: '500'
+                        }}>
+                            <div style={{
+                                width: '20px',
+                                height: '1px',
+                                background: 'var(--border)',
+                                marginRight: 'var(--space)'
+                            }} />
+                            Parallel Execution
+                            <div style={{
+                                flex: 1,
+                                height: '1px',
+                                background: 'var(--border)',
+                                marginLeft: 'var(--space)'
+                            }} />
+                        </div>
+
+                        <div className="grid" style={{
                             gridTemplateColumns: `repeat(${log.children.length}, 1fr)`,
-                            gap: 16,
-                            minHeight: 100
-                        }}
-                    >
-                        {log.children.map((parallelLog, idx) => (
-                            <div key={parallelLog.id} className="parallel-item">
-                                {/* Optionally, show branch number or icon */}
-                                {renderLogStructure([parallelLog], depth, `${keyPrefix}-${log.id}-parallel-${idx}`)}
-                            </div>
-                        ))}
+                            gap: 'calc(var(--space) * 2)'
+                        }}>
+                            {log.children.map((parallelLog, idx) => (
+                                <div key={parallelLog.id} style={{
+                                    padding: 'var(--space)',
+                                    background: 'var(--bg)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: '8px',
+                                    position: 'relative'
+                                }}>
+                                    {/* Branch label */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '-8px',
+                                        left: 'var(--space)',
+                                        background: 'var(--primary)',
+                                        color: 'white',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '10px',
+                                        fontWeight: '600'
+                                    }}>
+                                        Branch {idx + 1}
+                                    </div>
+
+                                    <div style={{ marginTop: 'var(--space)' }}>
+                                        {renderLogStructure([parallelLog], depth, `${keyPrefix}-${log.id}-parallel-${idx}`)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 );
             } else if (!log.referencedBlock && Array.isArray(log.children) && log.children.length === 1) {
-                // For single sequential child, render just as another element (no extra indent)
+                // Sequential child with subtle indicator
                 result.push(
-                    renderLogStructure(log.children, depth, `${keyPrefix}-${log.id}-seq`)
+                    <div key={`${log.id}-sequential`}>
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            margin: '4px 0',
+                            color: 'var(--text-light)',
+                            fontSize: '11px'
+                        }}>
+                            <div style={{
+                                width: '12px',
+                                height: '1px',
+                                background: 'var(--border)',
+                                marginRight: '4px'
+                            }} />
+                            ↓
+                        </div>
+                        {renderLogStructure(log.children, depth, `${keyPrefix}-${log.id}-seq`)}
+                    </div>
                 );
+            }
+
+            // Add sequential connector after processing children
+            if (hasNextSibling && log.children?.length) {
+                result.push(sequentialConnector);
             }
         });
 
         return <>{result}</>;
     };
 
+    // Mouse handling (unchanged)
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
         setIsDragging(true);
@@ -251,16 +341,15 @@ export default function LogsViewer({blockId, blockName, goBack}) {
 
     if (loading) {
         return (
-            <div className="app">
-                <div className="header">
-                    <Button variant="outline" onClick={goBack}>← Back</Button>
-                    <h1>Loading logs for: {blockName}</h1>
-                    <div className="controls">
-                        <span className="zoom-indicator">{(zoom * 100).toFixed(0)}%</span>
-                    </div>
-                </div>
-                <div className="canvas">
-                    <LoadingState message="Loading logs..."/>
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(to bottom right, var(--bg), #f3f4f6, var(--surface))',
+                paddingTop: 'calc(var(--space) * 6)'
+            }}>
+                <div className="container">
+                    <Button variant="outline" className="mb" onClick={goBack}>← Back</Button>
+                    <h2 className="section-title">Loading logs for {blockName}</h2>
+                    <LoadingState message="Loading execution logs..."/>
                 </div>
             </div>
         );
@@ -268,15 +357,14 @@ export default function LogsViewer({blockId, blockName, goBack}) {
 
     if (error) {
         return (
-            <div className="app">
-                <div className="header">
-                    <Button variant="outline" onClick={goBack}>← Back</Button>
-                    <h1>Logs for: {blockName}</h1>
-                    <div className="controls">
-                        <span className="zoom-indicator">{(zoom * 100).toFixed(0)}%</span>
-                    </div>
-                </div>
-                <div className="canvas">
+            <div style={{
+                minHeight: '100vh',
+                background: 'linear-gradient(to bottom right, var(--bg), #f3f4f6, var(--surface))',
+                paddingTop: 'calc(var(--space) * 6)'
+            }}>
+                <div className="container">
+                    <Button variant="outline" className="mb" onClick={goBack}>← Back</Button>
+                    <h2 className="section-title">Execution Logs</h2>
                     <div className="text-center error">{error}</div>
                 </div>
             </div>
@@ -284,39 +372,64 @@ export default function LogsViewer({blockId, blockName, goBack}) {
     }
 
     return (
-        <div className="app">
-            <div className="header">
-                <Button variant="outline" onClick={goBack}>← Back</Button>
-                <h1>Execution Flow: {blockName}</h1>
-                <div className="controls">
-                    <button className="control-btn" onClick={expandAll}>Expand All</button>
-                    <button className="control-btn" onClick={collapseAll}>Collapse All</button>
-                    <button className="control-btn" onClick={zoomOut}>Zoom Out</button>
-                    <button className="control-btn" onClick={zoomIn}>Zoom In</button>
-                    <span className="zoom-indicator">{(zoom * 100).toFixed(0)}%</span>
-                    <button className="reset-btn" onClick={resetView}>Reset View</button>
+        <div style={{
+            minHeight: '100vh',
+            background: 'linear-gradient(to bottom right, var(--bg), #f3f4f6, var(--surface))',
+            display: 'flex',
+            flexDirection: 'column'
+        }}>
+            {/* Header matching other pages */}
+            <div className="container" style={{ paddingTop: 'calc(var(--space) * 3)', paddingBottom: 'calc(var(--space) * 2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'calc(var(--space) * 2)' }}>
+                    <div>
+                        <Button variant="outline" onClick={goBack}>← Back</Button>
+                        <h2 style={{
+                            fontSize: '24px',
+                            fontWeight: '600',
+                            margin: 'calc(var(--space) * 2) 0 var(--space)',
+                            color: 'var(--text)'
+                        }}>
+                            Execution Flow: <span className="highlight">{blockName}</span>
+                        </h2>
+                    </div>
+
+                    {/* Clean controls */}
+                    <div style={{ display: 'flex', gap: 'var(--space)', alignItems: 'center' }}>
+                        <Button variant="outline" onClick={expandAll}>Expand All</Button>
+                        <Button variant="outline" onClick={collapseAll}>Collapse All</Button>
+                        <Button variant="outline" onClick={zoomOut}>Zoom Out</Button>
+                        <Button variant="outline" onClick={zoomIn}>Zoom In</Button>
+                        <span className="muted" style={{ fontSize: '14px' }}>
+                            {(zoom * 100).toFixed(0)}%
+                        </span>
+                        <Button onClick={resetView}>Reset View</Button>
+                    </div>
                 </div>
             </div>
 
+            {/* Main canvas area */}
             <div
                 ref={canvasRef}
-                className="canvas"
+                style={{
+                    flex: 1,
+                    overflow: 'hidden',
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    position: 'relative'
+                }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
-                style={{cursor: isDragging ? 'grabbing' : 'grab'}}
             >
                 <div
-                    className="viewport"
                     style={{
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: '0 0',
-                        position: 'relative',
-                        zIndex: 1
+                        padding: 'calc(var(--space) * 4)',
+                        minHeight: '100%'
                     }}
                 >
-                    <div style={{maxWidth: '1200px', padding: '32px'}}>
+                    <div className="container">
                         {logs.length === 0 ? (
                             <div className="text-center muted">No logs found for this block.</div>
                         ) : (
@@ -326,13 +439,27 @@ export default function LogsViewer({blockId, blockName, goBack}) {
                 </div>
             </div>
 
-            <div className="footer">
-                <div className="legend-item">
-                    <div className="legend-box legend-referenced"></div>
-                    <span>Referenced Block</span>
-                </div>
-                <div style={{marginLeft: 'auto', fontSize: '12px', opacity: 0.7}}>
-                    <span>💡 Ctrl/Cmd + scroll to zoom • Two-finger drag to pan on trackpad</span>
+            {/* Clean footer */}
+            <div style={{
+                borderTop: '1px solid var(--border)',
+                padding: 'var(--space) 0',
+                background: 'var(--surface)',
+                fontSize: '12px',
+                color: 'var(--text-light)'
+            }}>
+                <div className="container" style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <div style={{ display: 'flex', gap: 'calc(var(--space) * 3)' }}>
+                        <span><span style={{ color: 'var(--primary)' }}>●</span> Referenced Block</span>
+                        <span><span style={{ color: '#f59e0b' }}>●</span> Parallel Execution</span>
+                        <span>↓ Sequential Flow</span>
+                    </div>
+                    <div>
+                        💡 Ctrl/Cmd + scroll to zoom • Drag to pan
+                    </div>
                 </div>
             </div>
         </div>

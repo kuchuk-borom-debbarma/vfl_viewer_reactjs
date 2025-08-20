@@ -1,32 +1,9 @@
 import React from "react";
 import { LogEntry } from "../api/vfl";
+import {getLogSymbol} from "../utils/LogUtil";
+import {getTrimmedId, truncate} from "../utils/General";
 
-function getLogSymbol(log: LogEntry): string {
-    switch (log.logType) {
-        case "SUB_BLOCK_START_PRIMARY":           return "▶️";
-        case "SUB_BLOCK_START_SECONDARY_NO_JOIN": return "➕";
-        case "SUB_BLOCK_START_SECONDARY_JOIN":    return "➗";
-        case "PUBLISH_EVENT":                     return "📢";
-        case "SUB_BLOCK_CONTINUE":                return "⏩";
-        case "SUB_BLOCK_CONTINUE_COMPLETE":       return "✅";
-        case "EVENT_LISTENER":                    return "🎧";
-        case "MESSAGE":     return "📝";
-        case "WARN":        return "⚠️";
-        case "ERROR":       return "❌";
-        default:            return "📄";
-    }
-}
-
-function truncate(str: string, n = 80): string {
-    if (!str) return "";
-    return str.length > n ? str.slice(0, n - 1) + "…" : str;
-}
-
-function getTrimmedId(id: string) {
-    if (!id) return "";
-    const dash = id.lastIndexOf("-");
-    return dash >= 0 && dash < id.length - 1 ? id.slice(dash + 1) : id.slice(-6);
-}
+// ... [keeping all existing functions: getLogSymbol, truncate, getTrimmedId] ...
 
 export function LogCard({
                             log,
@@ -44,104 +21,101 @@ export function LogCard({
 
     return (
         <div
-            className={`log-entry${hasRef ? " referenced clickable" : ""}`}
+            className={`card${hasRef ? " clickable" : ""}`}
             onClick={hasRef ? onToggle : undefined}
             style={{
-                userSelect: "none",
                 cursor: hasRef ? "pointer" : undefined,
-                padding: "16px",
-                marginBottom: 18,
-                background: hasRef ? "rgba(59, 130, 246, 0.05)" : undefined,
-                border: hasRef ? "1px solid rgba(59, 130, 246, 0.2)" : undefined,
-                borderRadius: 9,
+                marginBottom: 'var(--space)',
+                background: hasRef ? '#eff6ff' : 'var(--surface)',
+                border: hasRef ? '1px solid var(--primary)' : '1px solid var(--border)',
+                transition: 'all 0.2s ease'
             }}
         >
             {/* Main log row */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 'var(--space)' }}>
                 {hasRef && (
-                    <span className={`arrow${!collapsed ? " rotated" : ""}`}>
-                        {loadingReferenced ? <span style={{ fontSize: 13 }}>⏳</span> : "▶"}
+                    <span style={{
+                        color: 'var(--primary)',
+                        fontSize: '12px',
+                        transform: !collapsed ? 'rotate(90deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease'
+                    }}>
+                        {loadingReferenced ? "⏳" : "▶"}
                     </span>
                 )}
-                <span>{getLogSymbol(log)}</span>
-                <span style={{ color: "#9fb5d1", fontSize: 11 }}>
-                    <strong>ID:</strong> {getTrimmedId(log.id)}
+                <span style={{ fontSize: '16px' }}>{getLogSymbol(log)}</span>
+                <span className="muted" style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                    {getTrimmedId(log.id)}
                 </span>
-                <span style={{ fontWeight: 500, fontSize: 14, color: "white" }}>
+                <span style={{ fontWeight: '500', flex: 1 }}>
                     {truncate(log.message || "(no message)", 60)}
                 </span>
-                <span className="timestamp" style={{ marginLeft: "auto", fontSize: 12, opacity: 0.7 }}>
+                <span className="muted" style={{ fontSize: '12px' }}>
                     {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ""}
                 </span>
             </div>
 
-            {/* Referenced block info */}
-            {hasRef && refBlock && (
+            {/* Referenced block info - minimal styling */}
+            {hasRef && refBlock && (collapsed || !log.children || log.children.length === 0) && (
                 <div style={{
-                    marginTop: 15,
-                    background: "rgba(30,58,138,0.06)",
-                    padding: "12px 18px",
-                    borderRadius: 7,
-                    border: "1px solid rgba(59,130,246,0.08)",
+                    marginTop: 'var(--space)',
+                    padding: 'var(--space)',
+                    background: 'var(--bg)',
+                    borderRadius: '6px',
+                    fontSize: '13px'
                 }}>
-                    <div style={{
-                        fontSize: 13, fontWeight: 600, color: "#60a5fa",
-                        marginBottom: 6, letterSpacing: 0.2
-                    }}>
+                    <div style={{ fontWeight: '600', marginBottom: '4px', color: 'var(--primary)' }}>
                         Referenced Block
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", rowGap: 4, columnGap: 14, fontSize: 13 }}>
-                        <div style={{ color: "#8ca7c8" }}>Block Name:</div>
-                        <div>{truncate(refBlock.name || "(none)", 32)}</div>
-                        <div style={{ color: "#8ca7c8" }}>Block ID:</div>
-                        <div style={{ fontFamily: "SF Mono, monospace", fontSize: 12, color: "#bad0f8" }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
+                        <span className="muted">Name:</span>
+                        <span>{truncate(refBlock.name || "(none)", 32)}</span>
+                        <span className="muted">ID:</span>
+                        <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>
                             {getTrimmedId(refBlock.id)}
-                        </div>
+                        </span>
                         {refBlock.endMessage && (
                             <>
-                                <div style={{ color: "#8ca7c8" }}>End Message:</div>
-                                <div style={{ color: "#62afd4", fontStyle: "italic" }}>
+                                <span className="muted">Result:</span>
+                                <span style={{ fontStyle: 'italic', color: 'var(--primary)' }}>
                                     "{truncate(refBlock.endMessage, 48)}"
-                                </div>
+                                </span>
                             </>
                         )}
                     </div>
-                    <div style={{ marginTop: 7, color: "#999", fontSize: 11 }}>
-                        Click to {collapsed ? "expand" : "collapse"} block logs
+                    <div className="muted" style={{ fontSize: '11px', marginTop: '4px' }}>
+                        Click to {collapsed ? "expand" : "collapse"}
                     </div>
+                </div>
+            )}
 
-                    {/* Referenced logs */}
-                    {!collapsed && log.children && log.children.length > 0 && (
-                        <div style={{
-                            marginTop: 14,
-                            borderTop: "1px solid #222a34",
-                            paddingTop: 8,
+            {/* Referenced logs in minimal style */}
+            {hasRef && !collapsed && log.children && log.children.length > 0 && (
+                <div style={{
+                    marginTop: 'var(--space)',
+                    paddingTop: 'var(--space)',
+                    borderTop: '1px solid var(--border)'
+                }}>
+                    {log.children.map((refLog, idx) => (
+                        <div key={refLog.id || idx} style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 'var(--space)',
+                            padding: '4px 0',
+                            fontSize: '13px'
                         }}>
-                            {log.children.map((refLog, idx) => (
-                                <div key={refLog.id || idx}
-                                     style={{
-                                         display: "flex",
-                                         alignItems: "center",
-                                         gap: 10,
-                                         padding: "5px 0",
-                                         fontSize: 13,
-                                     }}>
-                                    <span>{getLogSymbol(refLog)}</span>
-                                    <span style={{ color: "#9fb5d1", fontSize: 11 }}>
-                                        <strong>ID:</strong> {getTrimmedId(refLog.id)}
-                                    </span>
-                                    <span style={{ color: "#fff" }}>
-                                        {truncate(refLog.message || "(no message)", 66)}
-                                    </span>
-                                    <span style={{
-                                        marginLeft: "auto", fontSize: 11, opacity: 0.6
-                                    }}>
-                                        {refLog.timestamp ? new Date(refLog.timestamp).toLocaleTimeString() : ""}
-                                    </span>
-                                </div>
-                            ))}
+                            <span>{getLogSymbol(refLog)}</span>
+                            <span className="muted" style={{ fontFamily: 'monospace', fontSize: '10px' }}>
+                                {getTrimmedId(refLog.id)}
+                            </span>
+                            <span style={{ flex: 1 }}>
+                                {truncate(refLog.message || "(no message)", 66)}
+                            </span>
+                            <span className="muted" style={{ fontSize: '11px' }}>
+                                {refLog.timestamp ? new Date(refLog.timestamp).toLocaleTimeString() : ""}
+                            </span>
                         </div>
-                    )}
+                    ))}
                 </div>
             )}
         </div>
