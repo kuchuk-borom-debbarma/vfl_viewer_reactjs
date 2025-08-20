@@ -9,8 +9,19 @@ export default function Operations({ goBack }: { goBack: () => void }) {
     const { items: blocks, loading, error, loadMore } = useBlocks();
     const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
 
+    // Handler for navigating to a referenced block
+    const handleNavigateToBlock = (block: Block) => {
+        setSelectedBlock(block);
+    };
+
     if (selectedBlock) {
-        return <LogsViewer block={selectedBlock} goBack={() => setSelectedBlock(null)} />;
+        return (
+            <LogsViewer
+                block={selectedBlock}
+                goBack={() => setSelectedBlock(null)}
+                onNavigateToBlock={handleNavigateToBlock} // Pass navigation handler
+            />
+        );
     }
 
     return (
