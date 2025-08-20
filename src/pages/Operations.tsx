@@ -1,10 +1,17 @@
-import React from "react";
+// FILE: src/pages/Operations.tsx (updated)
+import React, { useState } from "react";
 import { Button } from "../components/UI";
 import BlockCard from "../components/BlockCard";
 import { useBlocks } from "../hooks/useBlocks";
+import LogsViewer from "./LogsViewer";
 
 export default function Operations({ goBack }: { goBack: () => void }) {
     const { items: blocks, loading, error, loadMore } = useBlocks();
+    const [selectedBlock, setSelectedBlock] = useState<{ id: string; name: string } | null>(null);
+
+    if (selectedBlock) {
+        return <LogsViewer blockId={selectedBlock.id} blockName={selectedBlock.name} goBack={() => setSelectedBlock(null)} />;
+    }
 
     return (
         <div className="container section">
@@ -17,7 +24,15 @@ export default function Operations({ goBack }: { goBack: () => void }) {
                 ) : blocks.length === 0 && loading ? (
                     <div className="text-center muted" style={{ gridColumn: "1/-1" }}>Loading...</div>
                 ) : (
-                    blocks.map(block => <BlockCard key={block.id} block={block} />)
+                    blocks.map(block => (
+                        <div
+                            key={block.id}
+                            onClick={() => setSelectedBlock({ id: block.id, name: block.name })}
+                            style={{ cursor: "pointer" }}
+                        >
+                            <BlockCard block={block} />
+                        </div>
+                    ))
                 )}
             </div>
 
