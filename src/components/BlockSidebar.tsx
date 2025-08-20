@@ -25,34 +25,7 @@ export default function BlockSidebar({ block, isOpen, onToggle }: BlockSidebarPr
 
     return (
         <>
-            {/* Sidebar Toggle Button */}
-            <button
-                onClick={onToggle}
-                style={{
-                    position: 'fixed',
-                    top: '20px',
-                    left: isOpen ? '320px' : '20px',
-                    zIndex: 1001,
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--surface)',
-                    color: 'var(--primary)',
-                    fontSize: '18px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    transition: 'all 0.3s ease'
-                }}
-                title={isOpen ? "Hide block info" : "Show block info"}
-            >
-                {isOpen ? '❮' : 'ℹ️'}
-            </button>
-
-            {/* Sidebar */}
+            {/* Sidebar - NO TOGGLE BUTTON HERE ANYMORE */}
             <div
                 style={{
                     position: 'fixed',

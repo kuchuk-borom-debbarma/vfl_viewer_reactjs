@@ -5,10 +5,7 @@ import { LogCard } from "../components/LogCard";
 import BlockSidebar from "../components/BlockSidebar";
 import ControlsBar from "../components/ControlsBar";
 
-export default function LogsViewer({ block, goBack }: {
-    block: Block;
-    goBack: () => void
-}) {
+export default function LogsViewer({ block, goBack }: { block: Block; goBack: () => void }) {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -23,18 +20,13 @@ export default function LogsViewer({ block, goBack }: {
 
     const canvasRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        loadLogs();
-    }, [block.id]);
-
+    useEffect(() => { loadLogs(); }, [block.id]);
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-
         const handleWheel = (e: WheelEvent) => {
             e.preventDefault();
-            e.stopPropagation(); // Prevent triggering log expansion
-
+            e.stopPropagation();
             if (inputMode === "mouse") {
                 if (e.ctrlKey || e.metaKey) {
                     const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -54,7 +46,6 @@ export default function LogsViewer({ block, goBack }: {
                 }
             }
         };
-
         canvas.addEventListener('wheel', handleWheel, { passive: false });
         return () => canvas.removeEventListener('wheel', handleWheel);
     }, [inputMode]);
@@ -77,12 +68,8 @@ export default function LogsViewer({ block, goBack }: {
         const referencedBlocks = new Set<string>();
         const findReferencedBlocks = (entries: LogEntry[]) => {
             entries.forEach(log => {
-                if (log.referencedBlock) {
-                    referencedBlocks.add(log.id);
-                }
-                if (log.children?.length) {
-                    findReferencedBlocks(log.children);
-                }
+                if (log.referencedBlock) referencedBlocks.add(log.id);
+                if (log.children?.length) findReferencedBlocks(log.children);
             });
         };
         findReferencedBlocks(logs);
@@ -92,42 +79,31 @@ export default function LogsViewer({ block, goBack }: {
     const toggleCollapse = (logId: string) => {
         setCollapsed(prev => {
             const newCollapsed = new Set(prev);
-            if (newCollapsed.has(logId)) {
-                newCollapsed.delete(logId);
-            } else {
-                newCollapsed.add(logId);
-            }
+            if (newCollapsed.has(logId)) newCollapsed.delete(logId);
+            else newCollapsed.add(logId);
             return newCollapsed;
         });
     };
 
     const handleExpandReferencedBlock = async (log: LogEntry) => {
         if (!log.referencedBlock) return;
-
         if (!collapsed.has(log.id) && log.children?.length > 0) {
             toggleCollapse(log.id);
             return;
         }
-
         setLoadingReferencedBlocks(prev => new Set([...prev, log.id]));
         try {
             const referencedLogs = await getLogsByBlockId(log.referencedBlock.id, 10, 50);
             setLogs(prev => {
                 const updateLogWithChildren = (logEntry: LogEntry): LogEntry => {
-                    if (logEntry.id === log.id) {
+                    if (logEntry.id === log.id)
                         return { ...logEntry, children: referencedLogs };
-                    }
-                    if (logEntry.children?.length) {
-                        return {
-                            ...logEntry,
-                            children: logEntry.children.map(updateLogWithChildren)
-                        };
-                    }
+                    if (logEntry.children?.length)
+                        return { ...logEntry, children: logEntry.children.map(updateLogWithChildren) };
                     return logEntry;
                 };
                 return prev.map(updateLogWithChildren);
             });
-
             const newReferencedBlocks = new Set<string>();
             const findNewReferencedBlocks = (entries: LogEntry[]) => {
                 entries.forEach(entry => {
@@ -136,7 +112,6 @@ export default function LogsViewer({ block, goBack }: {
                 });
             };
             findNewReferencedBlocks(referencedLogs);
-
             setCollapsed(prev => {
                 const updated = new Set([...prev, ...newReferencedBlocks]);
                 updated.delete(log.id);
@@ -155,20 +130,17 @@ export default function LogsViewer({ block, goBack }: {
 
     const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root") => {
         if (!logs || logs.length === 0) return null;
-
         const result: JSX.Element[] = [];
         logs.forEach((log, i) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
             const hasNextSibling = i < logs.length - 1;
-
             const sequentialConnector = hasNextSibling ? (
                 <div key={`connector-${log.id}`} style={{
                     width: '2px', height: '8px', background: 'var(--border)',
                     margin: '4px 0 4px 12px', borderRadius: '1px'
                 }} />
             ) : null;
-
             result.push(
                 <div key={`${keyPrefix}-${i}`} style={{ position: 'relative' }}>
                     <LogCard
@@ -179,9 +151,7 @@ export default function LogsViewer({ block, goBack }: {
                     />
                 </div>
             );
-
             if (hasNextSibling && !log.children?.length) result.push(sequentialConnector);
-
             if (log.referencedBlock && log.children?.length > 0 && !isCollapsed) {
                 result.push(
                     <div
@@ -199,7 +169,6 @@ export default function LogsViewer({ block, goBack }: {
                     </div>
                 );
             }
-
             if (!log.referencedBlock && Array.isArray(log.children) && log.children.length > 1) {
                 result.push(
                     <div key={`${log.id}-parallels`} style={{ margin: 'calc(var(--space) * 2) 0' }}>
@@ -211,15 +180,9 @@ export default function LogsViewer({ block, goBack }: {
                             fontSize: '12px',
                             fontWeight: '500'
                         }}>
-                            <div style={{
-                                width: '20px', height: '1px',
-                                background: 'var(--border)', marginRight: 'var(--space)'
-                            }} />
+                            <div style={{ width: '20px', height: '1px', background: 'var(--border)', marginRight: 'var(--space)' }} />
                             🔀 Parallel Execution
-                            <div style={{
-                                flex: 1, height: '1px',
-                                background: 'var(--border)', marginLeft: 'var(--space)'
-                            }} />
+                            <div style={{ flex: 1, height: '1px', background: 'var(--border)', marginLeft: 'var(--space)' }} />
                         </div>
                         <div className="grid" style={{
                             gridTemplateColumns: `repeat(${log.children.length}, 1fr)`,
@@ -265,10 +228,8 @@ export default function LogsViewer({ block, goBack }: {
                             fontSize: '11px'
                         }}>
                             <div style={{
-                                width: '12px',
-                                height: '1px',
-                                background: 'var(--border)',
-                                marginRight: '4px'
+                                width: '12px', height: '1px',
+                                background: 'var(--border)', marginRight: '4px'
                             }} />
                             ⬇️
                         </div>
@@ -276,10 +237,8 @@ export default function LogsViewer({ block, goBack }: {
                     </div>
                 );
             }
-
             if (hasNextSibling && log.children?.length) result.push(sequentialConnector);
         });
-
         return <>{result}</>;
     };
 
@@ -289,27 +248,17 @@ export default function LogsViewer({ block, goBack }: {
         setIsDragging(true);
         setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     };
-
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDragging) {
             e.stopPropagation();
-            setPan({
-                x: e.clientX - dragStart.x,
-                y: e.clientY - dragStart.y
-            });
+            setPan({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
         }
     };
-
     const handleMouseUp = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsDragging(false);
     };
-
-    const resetView = () => {
-        setZoom(1);
-        setPan({ x: 0, y: 0 });
-    };
-
+    const resetView = () => { setZoom(1); setPan({ x: 0, y: 0 }); };
     const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
     const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.1));
     const expandAll = () => setCollapsed(new Set());
@@ -340,7 +289,6 @@ export default function LogsViewer({ block, goBack }: {
             </div>
         );
     }
-
     if (error) {
         return (
             <div style={{
@@ -370,27 +318,46 @@ export default function LogsViewer({ block, goBack }: {
                 isOpen={sidebarOpen}
                 onToggle={() => setSidebarOpen(!sidebarOpen)}
             />
-
-            {/* Header with Controls */}
-            <div
-                className="container"
-                style={{
-                    paddingTop: 'calc(var(--space) * 3)',
-                    paddingBottom: 'calc(var(--space) * 2)',
-                    marginLeft: sidebarOpen ? '300px' : '0',
-                    transition: 'margin-left 0.3s ease'
-                }}
+            {/* Header Area: Back button and sidebar toggle as neighbors, never overlap */}
+            <div className="container"
+                 style={{
+                     paddingTop: 'calc(var(--space) * 3)',
+                     paddingBottom: 'calc(var(--space) * 2)',
+                     marginLeft: sidebarOpen ? '300px' : '0',
+                     transition: 'margin-left 0.3s ease'
+                 }}
             >
                 <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    marginBottom: 'calc(var(--space) * 2)',
-                    flexWrap: 'wrap',
+                    alignItems: 'center',
                     gap: 'var(--space)'
                 }}>
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <Button variant="outline" onClick={goBack}>← Back</Button>
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            style={{
+                                marginLeft: 8,
+                                zIndex: 1010,
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border)',
+                                background: 'var(--surface)',
+                                color: 'var(--primary)',
+                                fontSize: '18px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                transition: 'all 0.3s ease'
+                            }}
+                            title={sidebarOpen ? "Hide block info" : "Show block info"}
+                        >
+                            {sidebarOpen ? '❮' : 'ℹ️'}
+                        </button>
                         <h2 style={{
                             fontSize: '24px',
                             fontWeight: '600',
@@ -400,7 +367,6 @@ export default function LogsViewer({ block, goBack }: {
                             🔄 Execution Flow: <span className="highlight">{block.name}</span>
                         </h2>
                     </div>
-
                     <ControlsBar
                         zoom={zoom}
                         onZoomIn={zoomIn}
@@ -413,8 +379,7 @@ export default function LogsViewer({ block, goBack }: {
                     />
                 </div>
             </div>
-
-            {/* Main Canvas */}
+            {/* Main Canvas for Logs */}
             <div
                 ref={canvasRef}
                 style={{
@@ -446,7 +411,6 @@ export default function LogsViewer({ block, goBack }: {
                     </div>
                 </div>
             </div>
-
             {/* Footer */}
             <div style={{
                 borderTop: '1px solid var(--border)',
