@@ -5,6 +5,7 @@ import ControlsBar from "../components/ControlsBar";
 import {LogCard} from "../components/LogCard";
 import {Block, LogEntry} from "../types";
 import {getLogsByBlockId} from "../api/vfl";
+import {getTrimmedId, truncate} from "../utils/formatters";
 
 export default function LogsViewer({
                                        block,
@@ -32,6 +33,7 @@ export default function LogsViewer({
     useEffect(() => {
         loadLogs();
     }, [block.id]);
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -239,9 +241,13 @@ export default function LogsViewer({
                                         padding: '2px 8px',
                                         borderRadius: '4px',
                                         fontSize: '10px',
-                                        fontWeight: '600'
+                                        fontWeight: '600',
+                                        maxWidth: '250px',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis'
                                     }}>
-                                        Branch {idx + 1}
+                                        {`${getTrimmedId(log.id)}: ${truncate(log.message || log.logType.replace(/_/g, ' '), 22)}`}
                                     </div>
                                     <div style={{marginTop: 'var(--space)'}}>
                                         {/* Pass current log's timestamp as parent for parallel branches */}
@@ -279,28 +285,34 @@ export default function LogsViewer({
 
         return <>{result}</>;
     };
+
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
         e.stopPropagation();
         setIsDragging(true);
         setDragStart({x: e.clientX - pan.x, y: e.clientY - pan.y});
     };
+
     const handleMouseMove = (e: React.MouseEvent) => {
         if (isDragging) {
             e.stopPropagation();
             setPan({x: e.clientX - dragStart.x, y: e.clientY - dragStart.y});
         }
     };
+
     const handleMouseUp = (e: React.MouseEvent) => {
         e.stopPropagation();
         setIsDragging(false);
     };
+
     const resetView = () => {
         setZoom(1);
         setPan({x: 0, y: 0});
     };
+
     const zoomIn = () => setZoom(prev => Math.min(prev + 0.2, 3));
     const zoomOut = () => setZoom(prev => Math.max(prev - 0.2, 0.1));
+
     const expandAll = () => setCollapsed(new Set());
     const collapseAll = () => {
         const allReferencedBlocks = new Set<string>();
@@ -329,6 +341,7 @@ export default function LogsViewer({
             </div>
         );
     }
+
     if (error) {
         return (
             <div style={{
