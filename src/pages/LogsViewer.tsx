@@ -25,11 +25,8 @@ export default function LogsViewer({
     const [loadingReferencedBlocks, setLoadingReferencedBlocks] = useState<Set<string>>(new Set());
     const [referencedBlockData, setReferencedBlockData] = useState<Record<string, LogEntry[]>>({});
 
-    // New state for contextual load more functionality
     const [referencedBlockCursors, setReferencedBlockCursors] = useState<Record<string, string | null>>({});
     const [loadingMoreReferenced, setLoadingMoreReferenced] = useState<Set<string>>(new Set());
-
-    // NEW: State to track if more data is available
     const [hasMoreMainLogs, setHasMoreMainLogs] = useState(true);
     const [hasMoreReferencedLogs, setHasMoreReferencedLogs] = useState<Record<string, boolean>>({});
 
@@ -44,13 +41,11 @@ export default function LogsViewer({
 
     // Build tree structure from flat logs
     const buildTree = (logs: LogEntry[]): LogEntry[] => {
-        // Sort logs by timestamp, then by ID
         const sortedLogs = [...logs].sort((a, b) => {
             if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
             return a.id.localeCompare(b.id);
         });
 
-        // Create parent-child map
         const childrenMap = new Map<string, LogEntry[]>();
         const rootLogs: LogEntry[] = [];
 
@@ -65,7 +60,6 @@ export default function LogsViewer({
             }
         });
 
-        // Recursively attach children
         const attachChildren = (log: LogEntry): LogEntry => {
             const children = childrenMap.get(log.id) || [];
             return {
@@ -120,10 +114,7 @@ export default function LogsViewer({
             const response = await getLogsByBlockId(block.id);
             setAllLogs(response.logs);
             setNextCursor(response.nextCursor);
-
-            // Check if we got fewer logs than requested (meaning we've reached the end)
             setHasMoreMainLogs(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
-
             initializeCollapsedState(response.logs);
         } catch (err: any) {
             setError(err.message);
@@ -140,10 +131,7 @@ export default function LogsViewer({
             const response = await getLogsByBlockId(block.id, undefined, nextCursor);
             setAllLogs(prev => [...prev, ...response.logs]);
             setNextCursor(response.nextCursor);
-
-            // Update hasMore based on returned count and cursor
             setHasMoreMainLogs(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
-
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -159,7 +147,6 @@ export default function LogsViewer({
             }
         });
         setCollapsed(referencedBlocks);
-        // Clear any stale referenced block data
         setReferencedBlockData({});
         setReferencedBlockCursors({});
         setHasMoreReferencedLogs({});
@@ -186,18 +173,8 @@ export default function LogsViewer({
 
         try {
             const response = await getLogsByBlockId(log.referencedBlock.id);
-            setReferencedBlockData(prev => ({
-                ...prev,
-                [log.id]: response.logs
-            }));
-
-            // Track the cursor for this referenced block
-            setReferencedBlockCursors(prev => ({
-                ...prev,
-                [log.id]: response.nextCursor
-            }));
-
-            // Track if this referenced block has more data
+            setReferencedBlockData(prev => ({ ...prev, [log.id]: response.logs }));
+            setReferencedBlockCursors(prev => ({ ...prev, [log.id]: response.nextCursor }));
             setHasMoreReferencedLogs(prev => ({
                 ...prev,
                 [log.id]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
@@ -208,7 +185,6 @@ export default function LogsViewer({
                 newSet.delete(log.id);
                 return newSet;
             });
-
         } catch (err: any) {
             setError(`Failed to load referenced block: ${err.message}`);
         } finally {
@@ -228,23 +204,15 @@ export default function LogsViewer({
 
         try {
             const response = await getLogsByBlockId(referencedBlockId, undefined, cursor);
-
             setReferencedBlockData(prev => ({
                 ...prev,
                 [logId]: [...(prev[logId] || []), ...response.logs]
             }));
-
-            setReferencedBlockCursors(prev => ({
-                ...prev,
-                [logId]: response.nextCursor
-            }));
-
-            // Update hasMore for this referenced block
+            setReferencedBlockCursors(prev => ({ ...prev, [logId]: response.nextCursor }));
             setHasMoreReferencedLogs(prev => ({
                 ...prev,
                 [logId]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
             }));
-
         } catch (err: any) {
             setError(`Failed to load more logs: ${err.message}`);
         } finally {
@@ -256,7 +224,6 @@ export default function LogsViewer({
         }
     };
 
-    // Enhanced Load More Button Component
     const LoadMoreButton = ({
                                 onClick,
                                 loading,
@@ -327,13 +294,13 @@ export default function LogsViewer({
         );
     };
 
-    // CORRECTED renderLogStructure - follows design philosophy exactly
+    // CLEAN LAYOUT APPROACH - Using proper CSS layout
     const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number): JSX.Element[] => {
         if (!logs || logs.length === 0) return [];
 
         const result: JSX.Element[] = [];
 
-        // Function to process a single log and all its sequential children
+        // Process each log with proper sequential/parallel handling
         const processLog = (log: LogEntry, index: number) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
@@ -342,12 +309,9 @@ export default function LogsViewer({
 
             const currentParentTimestamp = index > 0 ? logs[index - 1].timestamp : parentTimestamp;
 
-            // 1. Always render the main log card
+            // 1. Main log card
             result.push(
-                <div key={`${keyPrefix}-${log.id}-${index}`} style={{
-                    position: 'relative',
-                    pointerEvents: 'auto'
-                }}>
+                <div key={`${keyPrefix}-${log.id}-${index}`} style={{ marginBottom: '8px' }}>
                     <LogCard
                         log={log}
                         collapsed={isCollapsed}
@@ -359,37 +323,37 @@ export default function LogsViewer({
                 </div>
             );
 
-            // 2. If has referenced block and expanded, show referenced content (NESTED - ONLY CASE FOR NESTING)
+            // 2. Referenced block content (NESTED - ONLY nesting case)
             if (hasReferencedBlock && !isCollapsed && referencedBlockData[log.id]) {
                 const referencedTree = buildTree(referencedBlockData[log.id]);
                 result.push(
                     <div key={`${keyPrefix}-ref-${log.id}`} style={{
-                        marginLeft: '30px',
-                        marginTop: 'var(--space)',
-                        paddingLeft: '15px',
-                        borderLeft: '2px solid var(--primary)',
-                        opacity: 0.95,
-                        pointerEvents: 'auto',
+                        marginLeft: '40px',
+                        marginTop: '8px',
+                        marginBottom: '16px',
+                        paddingLeft: '20px',
+                        borderLeft: '3px solid var(--primary)',
                         background: 'rgba(37, 99, 235, 0.02)',
                         borderRadius: '0 8px 8px 0',
-                        position: 'relative'
+                        position: 'relative',
+                        padding: '16px'
                     }}>
                         <div style={{
                             position: 'absolute',
                             top: '-1px',
-                            left: '-2px',
+                            left: '-3px',
                             background: 'var(--primary)',
                             color: 'white',
-                            padding: '2px 8px',
-                            borderRadius: '0 4px 4px 0',
-                            fontSize: '10px',
+                            padding: '4px 12px',
+                            borderRadius: '0 6px 6px 0',
+                            fontSize: '11px',
                             fontWeight: '600',
                             letterSpacing: '0.5px'
                         }}>
                             🔗 {log.referencedBlock!.name}
                         </div>
 
-                        <div style={{ paddingTop: '20px' }}>
+                        <div style={{ paddingTop: '24px' }}>
                             {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
                         </div>
 
@@ -406,10 +370,10 @@ export default function LogsViewer({
                 );
             }
 
-            // 3. Handle children - CRITICAL: Children continue at same level (no nesting)
+            // 3. Handle children - NO NESTING, proper sequential/parallel
             if (hasChildren) {
                 if (log.children!.length === 1) {
-                    // Single child: Continue sequential flow at same level
+                    // Sequential: connector and continue
                     result.push(
                         <div key={`connector-${log.id}`} style={{
                             width: '2px',
@@ -419,15 +383,11 @@ export default function LogsViewer({
                             borderRadius: '1px'
                         }}/>
                     );
-                    processLog(log.children![0], 0); // Process child at same level
+                    processLog(log.children![0], 0); // Continue at same level
                 } else {
-                    // Multiple children: Show as parallel operations
+                    // Parallel: side by side layout
                     result.push(
-                        <div key={`${keyPrefix}-par-${log.id}`} style={{
-                            marginTop: '16px',
-                            marginBottom: '16px',
-                            pointerEvents: 'auto'
-                        }}>
+                        <div key={`${keyPrefix}-par-${log.id}`} style={{ margin: '16px 0' }}>
                             <div style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -442,7 +402,7 @@ export default function LogsViewer({
                                     background: 'var(--border)',
                                     marginRight: 'var(--space)'
                                 }}/>
-                                ⚡ Parallel Execution
+                                ⚡ Parallel Execution ({log.children!.length})
                                 <div style={{
                                     flex: 1,
                                     height: '1px',
@@ -451,24 +411,26 @@ export default function LogsViewer({
                                 }}/>
                             </div>
                             <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: `repeat(${log.children!.length}, 1fr)`,
-                                gap: 'calc(var(--space) * 2)',
-                                minHeight: '100px'
+                                display: 'flex',
+                                gap: '24px',
+                                alignItems: 'flex-start',
+                                overflowX: 'auto',
+                                paddingBottom: '8px'
                             }}>
                                 {log.children!.map((parallelLog, idx) => (
                                     <div key={parallelLog.id} style={{
-                                        padding: 'var(--space)',
+                                        flex: '0 0 auto',
+                                        minWidth: '350px',
+                                        padding: '12px',
                                         background: 'var(--bg)',
                                         border: '1px solid var(--border)',
                                         borderRadius: '8px',
-                                        position: 'relative',
-                                        pointerEvents: 'auto'
+                                        position: 'relative'
                                     }}>
                                         <div style={{
                                             position: 'absolute',
                                             top: '-8px',
-                                            left: 'var(--space)',
+                                            left: '12px',
                                             background: '#f59e0b',
                                             color: 'white',
                                             padding: '2px 8px',
@@ -478,7 +440,7 @@ export default function LogsViewer({
                                         }}>
                                             PARALLEL {idx + 1}
                                         </div>
-                                        <div style={{ marginTop: 'var(--space)' }}>
+                                        <div style={{ marginTop: '8px' }}>
                                             {renderLogStructure([parallelLog], depth, `${keyPrefix}-par-${log.id}-${idx}`, log.timestamp)}
                                         </div>
                                     </div>
@@ -490,66 +452,63 @@ export default function LogsViewer({
             }
         };
 
-        // Handle root level logs - if multiple with same parent, show as siblings
+        // Handle siblings - if multiple logs at root level, show as siblings
         if (logs.length > 1) {
-            // Multiple logs at same level = siblings (parallel operations)
             result.push(
-                <div key={`${keyPrefix}-siblings`} style={{
-                    marginTop: '16px',
-                    marginBottom: '16px',
-                    pointerEvents: 'auto'
-                }}>
+                <div key={`${keyPrefix}-siblings`} style={{ margin: '20px 0' }}>
                     <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        marginBottom: '12px',
+                        marginBottom: '16px',
                         color: 'var(--text-light)',
-                        fontSize: '12px',
-                        fontWeight: '500'
+                        fontSize: '14px',
+                        fontWeight: '600'
                     }}>
                         <div style={{
                             width: '20px',
                             height: '1px',
                             background: 'var(--border)',
-                            marginRight: 'var(--space)'
+                            marginRight: '12px'
                         }}/>
                         👥 Sibling Operations ({logs.length})
                         <div style={{
                             flex: 1,
                             height: '1px',
                             background: 'var(--border)',
-                            marginLeft: 'var(--space)'
+                            marginLeft: '12px'
                         }}/>
                     </div>
                     <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: `repeat(${Math.min(logs.length, 3)}, 1fr)`,
-                        gap: 'calc(var(--space) * 2)',
-                        minHeight: '100px'
+                        display: 'flex',
+                        gap: '32px',
+                        alignItems: 'flex-start',
+                        overflowX: 'auto',
+                        paddingBottom: '16px'
                     }}>
                         {logs.map((log, idx) => (
                             <div key={log.id} style={{
-                                padding: 'var(--space)',
+                                flex: '0 0 auto',
+                                minWidth: '400px',
+                                padding: '16px',
                                 background: 'var(--bg)',
-                                border: '1px solid var(--border)',
-                                borderRadius: '8px',
-                                position: 'relative',
-                                pointerEvents: 'auto'
+                                border: '2px solid #ec4899',
+                                borderRadius: '12px',
+                                position: 'relative'
                             }}>
                                 <div style={{
                                     position: 'absolute',
-                                    top: '-8px',
-                                    left: 'var(--space)',
+                                    top: '-12px',
+                                    left: '16px',
                                     background: '#ec4899',
                                     color: 'white',
-                                    padding: '2px 8px',
-                                    borderRadius: '4px',
-                                    fontSize: '10px',
+                                    padding: '4px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '11px',
                                     fontWeight: '600'
                                 }}>
                                     SIBLING {idx + 1}
                                 </div>
-                                <div style={{ marginTop: 'var(--space)' }}>
+                                <div style={{ marginTop: '8px' }}>
                                     {renderLogStructure([log], depth, `${keyPrefix}-sibling-${idx}`, parentTimestamp)}
                                 </div>
                             </div>
@@ -558,7 +517,7 @@ export default function LogsViewer({
                 </div>
             );
         } else {
-            // Single log - process normally with its children
+            // Single log - process normally
             logs.forEach((log, index) => processLog(log, index));
         }
 
@@ -715,6 +674,7 @@ export default function LogsViewer({
                 </div>
             </div>
 
+            {/* Canvas Area - No constrained containers */}
             <div
                 ref={canvasRef}
                 style={{
@@ -735,27 +695,25 @@ export default function LogsViewer({
                     style={{
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: '0 0',
-                        padding: 'calc(var(--space) * 4)',
-                        minHeight: '100%',
+                        padding: '40px',
+                        minWidth: 'max-content', // KEY: Allow content to size naturally
                         pointerEvents: 'auto'
                     }}
                 >
-                    <div className="container">
-                        {treeStructure.length === 0
-                            ? <div className="text-center muted">No logs found for this block.</div>
-                            : renderLogStructure(treeStructure)
-                        }
+                    {treeStructure.length === 0
+                        ? <div style={{ textAlign: 'center', color: 'var(--text-light)', padding: '60px' }}>No logs found for this block.</div>
+                        : renderLogStructure(treeStructure)
+                    }
 
-                        <LoadMoreButton
-                            onClick={loadMoreLogs}
-                            loading={loadingMore}
-                            hasMore={hasMoreMainLogs}
-                            label="Load More Main Logs"
-                            context="main"
-                            blockName={block.name}
-                            isNested={false}
-                        />
-                    </div>
+                    <LoadMoreButton
+                        onClick={loadMoreLogs}
+                        loading={loadingMore}
+                        hasMore={hasMoreMainLogs}
+                        label="Load More Main Logs"
+                        context="main"
+                        blockName={block.name}
+                        isNested={false}
+                    />
                 </div>
             </div>
 
@@ -778,13 +736,12 @@ export default function LogsViewer({
                     <div style={{ display: 'flex', gap: 'calc(var(--space) * 3)' }}>
                         <span>🔗 Referenced Block</span>
                         <span>📋 Referenced Block Logs</span>
-                        <span>📥 Main Block Logs</span>
                         <span>👥 Sibling Operations</span>
                         <span>⚡ Parallel Execution</span>
                         <span>⬇️ Sequential Flow</span>
                     </div>
                     <div>
-                        Ctrl/Cmd + scroll to zoom • Drag to pan • Click cards to expand or navigate
+                        Ctrl/Cmd + scroll to zoom • Drag to pan • Horizontal scroll for siblings
                     </div>
                 </div>
             </div>
