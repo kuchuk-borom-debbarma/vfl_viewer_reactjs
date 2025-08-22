@@ -25,7 +25,7 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                         Visual Flow Logger
                     </h1>
                     <p className="text-2xl mb-6 text-gray-700 max-w-4xl mx-auto leading-relaxed">
-                        <span className="font-semibold text-blue-600">Structured Logging Framework</span> that captures and visualizes
+                        <span className="font-semibold text-blue-600">Hierarchical Logging Framework</span> that captures and visualizes
                         how your applications <span className="font-semibold">actually execute</span>
                     </p>
                     <p className="text-lg mb-12 text-gray-600 max-w-3xl mx-auto">
@@ -46,9 +46,9 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                 </div>
             </section>
 
-            {/* Comparison Section */}
+            {/* Comparison Section - Updated with better examples */}
             <section className="py-20 px-6 bg-white/50">
-                <div className="max-w-6xl mx-auto">
+                <div className="max-w-7xl mx-auto">
                     <h2 className="text-4xl font-bold text-center mb-16 text-gray-800">
                         Traditional vs VFL Logging
                     </h2>
@@ -61,23 +61,35 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                             </div>
                             <div className="space-y-3 font-mono text-sm">
                                 <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
-                                    [INFO] Processing user order #12345
+                                    [INFO] 14:23:10 Processing order ORD-2025-8847
+                                </div>
+                                <div className="p-3 bg-gray-100 rounded border-l-4 border-blue-400">
+                                    [INFO] 14:23:11 Authenticating customer
+                                </div>
+                                <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
+                                    [INFO] 14:23:11 Validating email credentials
+                                </div>
+                                <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
+                                    [INFO] 14:23:11 Creating customer session
                                 </div>
                                 <div className="p-3 bg-gray-100 rounded border-l-4 border-yellow-400">
-                                    [WARN] Inventory service slow response
+                                    [INFO] 14:23:12 Processing payment
                                 </div>
                                 <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
-                                    [INFO] Payment processed successfully
+                                    [INFO] 14:23:13 Warehouse picking process
+                                </div>
+                                <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
+                                    [INFO] 14:23:13 Generating shipping label
                                 </div>
                                 <div className="p-3 bg-gray-100 rounded border-l-4 border-red-400">
-                                    [ERROR] Email service timeout
+                                    [ERROR] 14:23:15 Email service timeout
                                 </div>
-                                <div className="p-3 bg-gray-100 rounded border-l-4 border-gray-400">
-                                    [INFO] Order completed
+                                <div className="p-3 bg-gray-100 rounded border-l-4 border-green-400">
+                                    [INFO] 14:23:16 Order completed
                                 </div>
                             </div>
                             <div className="mt-6 text-red-600 text-sm">
-                                <p>❓ <strong>Questions:</strong></p>
+                                <p><strong>❓ Questions:</strong></p>
                                 <ul className="list-disc ml-6 space-y-1">
                                     <li>Which operations ran in parallel?</li>
                                     <li>What's the execution hierarchy?</li>
@@ -92,46 +104,127 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                             <div className="text-2xl font-bold text-green-700 mb-6 flex items-center gap-3">
                                 ✅ VFL Hierarchical Logging
                             </div>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-lg">▶️</span>
-                                    <div className="p-2 bg-blue-100 rounded border-l-4 border-blue-500 flex-1">
-                                        <strong>ORDER_PROCESSING</strong> - Processing user order #12345
+
+                            {/* Simulated VFL UI */}
+                            <div className="bg-white rounded-lg border border-green-300 p-4 space-y-3 text-sm">
+                                {/* Main Order Log */}
+                                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-300 rounded-xl p-3 cursor-pointer">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-lg">🛒</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">Start</span>
+                                            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">8847</span>
+                                            <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded font-semibold">+0ms</span>
+                                        </div>
+                                        <span className="flex-1 font-medium text-blue-700">New order received: ORD-2025-8847</span>
+                                        <span className="text-xs text-gray-500">14:23:10</span>
                                     </div>
                                 </div>
-                                <div className="ml-6 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm">⚡</span>
-                                        <div className="text-xs text-gray-600 bg-orange-100 px-2 py-1 rounded">
-                                            PARALLEL EXECUTION (3 services)
+
+                                {/* Authentication Block - Expandable */}
+                                <div className="ml-4 space-y-2">
+                                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-xl p-3">
+                                        <div className="flex items-center gap-3">
+                                            <button className="p-1 text-blue-600 hover:bg-blue-100 rounded">▼</button>
+                                            <span className="text-lg">🔐</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="bg-emerald-600 text-white text-xs px-2 py-1 rounded font-semibold">Start</span>
+                                                <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">auth-block-001</span>
+                                            </div>
+                                            <span className="flex-1 font-medium text-emerald-700">Authenticating customer</span>
+                                            <span className="text-xs text-gray-500">+150ms</span>
                                         </div>
                                     </div>
-                                    <div className="ml-4 grid grid-cols-1 gap-2">
-                                        <div className="p-2 bg-yellow-100 rounded border-l-4 border-yellow-500 text-xs">
-                                            🔗 <strong>INVENTORY_CHECK</strong> - Checking stock levels (+250ms)
+
+                                    {/* Nested Authentication Steps */}
+                                    <div className="ml-8 pl-4 border-l-2 border-blue-200 space-y-2">
+                                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm">🔍</span>
+                                                <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded">Info</span>
+                                                <span className="text-sm text-gray-700">Validating email credentials</span>
+                                                <span className="text-xs text-gray-500">+10ms</span>
+                                            </div>
                                         </div>
-                                        <div className="p-2 bg-green-100 rounded border-l-4 border-green-500 text-xs">
-                                            🔗 <strong>PAYMENT_SERVICE</strong> - Processing payment (+180ms)
-                                        </div>
-                                        <div className="p-2 bg-red-100 rounded border-l-4 border-red-500 text-xs">
-                                            🔗 <strong>EMAIL_SERVICE</strong> - Send confirmation (timeout +5s)
+                                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-2">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-sm">🎫</span>
+                                                <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded">Info</span>
+                                                <span className="text-sm text-gray-700">Creating customer session</span>
+                                                <span className="text-xs text-gray-500">+20ms</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 ml-4">
-                                        <span className="text-sm">✅</span>
-                                        <div className="p-2 bg-green-200 rounded border-l-4 border-green-600 flex-1 text-xs">
-                                            <strong>ORDER_COMPLETION</strong> - Order finalized (+5.2s total)
+                                </div>
+
+                                {/* Parallel Operations */}
+                                <div className="ml-4">
+                                    <div className="flex items-center mb-3 text-purple-600 text-sm font-semibold">
+                                        <div className="w-4 h-px bg-purple-300"></div>
+                                        <div className="mx-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full text-xs">
+                                            👥 PARALLEL OPERATIONS (2 concurrent flows)
+                                        </div>
+                                        <div className="flex-1 h-px bg-purple-300"></div>
+                                    </div>
+
+                                    <div className="flex gap-4 overflow-x-auto pb-4">
+                                        {/* Warehouse Operation */}
+                                        <div className="flex-shrink-0 min-w-[280px] bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-3">
+                                            <div className="absolute -top-2 left-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                SIBLING 1
+                                            </div>
+                                            <div className="pt-2">
+                                                <div className="bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-xl p-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">🏭</span>
+                                                        <span className="bg-emerald-600 text-white text-xs px-1 py-0.5 rounded">Start</span>
+                                                        <span className="text-xs font-medium text-emerald-700">Warehouse picking</span>
+                                                        <span className="text-xs text-gray-500">+2.1s</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Shipping Operation */}
+                                        <div className="flex-shrink-0 min-w-[280px] bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-300 rounded-xl p-3">
+                                            <div className="absolute -top-2 left-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                SIBLING 2
+                                            </div>
+                                            <div className="pt-2">
+                                                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-300 rounded-xl p-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm">🏷️</span>
+                                                        <span className="bg-indigo-600 text-white text-xs px-1 py-0.5 rounded">Join</span>
+                                                        <span className="text-xs font-medium text-indigo-700">Shipping label</span>
+                                                        <span className="text-xs text-gray-500">+2.3s</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Completion */}
+                                <div className="ml-4">
+                                    <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border-2 border-teal-300 rounded-xl p-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-lg">✅</span>
+                                            <span className="bg-teal-600 text-white text-xs px-2 py-1 rounded font-semibold">Complete</span>
+                                            <span className="flex-1 font-medium text-teal-700">Order processing completed</span>
+                                            <span className="text-xs text-teal-600 bg-teal-100 px-2 py-1 rounded font-semibold">+5.2s total</span>
                                         </div>
                                     </div>
                                 </div>
                             </div>
+
                             <div className="mt-6 text-green-700 text-sm">
-                                <p>✨ <strong>Clear Insights:</strong></p>
+                                <p><strong>✨ Clear Insights:</strong></p>
                                 <ul className="list-disc ml-6 space-y-1">
-                                    <li>Visual execution hierarchy</li>
+                                    <li>Visual execution hierarchy & nesting</li>
                                     <li>Parallel vs sequential operations</li>
                                     <li>Cross-service flow tracing</li>
                                     <li>Precise timing relationships</li>
+                                    <li>Interactive exploration of nested blocks</li>
                                 </ul>
                             </div>
                         </div>
@@ -139,7 +232,7 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                 </div>
             </section>
 
-            {/* Features Section */}
+            {/* Features Section - Updated to remove real-time */}
             <section className="py-20 px-6">
                 <div className="max-w-6xl mx-auto">
                     <h2 className="text-4xl font-bold text-center mb-16 text-gray-800">
@@ -159,21 +252,21 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                             color="from-purple-500 to-purple-600"
                         />
                         <FeatureCard
-                            title="Pattern Recognition"
+                            title="Execution Pattern Recognition"
                             icon="⚡"
-                            desc="Automatically identify and visualize execution patterns: sequential, parallel, pub/sub, fire-and-forget."
+                            desc="Automatically identify and visualize different program flow patterns: sequential, parallel, pub/sub, fire-and-forget, and nested operations."
                             color="from-green-500 to-green-600"
                         />
                         <FeatureCard
-                            title="Real-time Visualization"
+                            title="Interactive Visualization"
                             icon="📊"
-                            desc="Interactive, zoomable flow diagrams that update in real-time as your applications execute."
+                            desc="Zoomable, collapsible flow diagrams with detailed timing analysis and cross-references between related operations."
                             color="from-orange-500 to-orange-600"
                         />
                         <FeatureCard
                             title="Performance Insights"
                             icon="🚀"
-                            desc="Built-in timing analysis showing bottlenecks, parallel efficiency, and execution relationships."
+                            desc="Built-in timing analysis showing bottlenecks, parallel efficiency, and execution relationships with precise metrics."
                             color="from-red-500 to-red-600"
                         />
                         <FeatureCard
@@ -181,41 +274,6 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                             icon="💻"
                             desc="Minimal API, zero configuration overhead, and intuitive visual debugging for modern development workflows."
                             color="from-indigo-500 to-indigo-600"
-                        />
-                    </div>
-                </div>
-            </section>
-
-            {/* Execution Patterns Section */}
-            <section className="py-20 px-6 bg-gradient-to-r from-gray-50 to-blue-50">
-                <div className="max-w-6xl mx-auto">
-                    <h2 className="text-4xl font-bold text-center mb-16 text-gray-800">
-                        Supported Execution Patterns
-                    </h2>
-                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <PatternCard
-                            title="Sequential Flow"
-                            icon="➡️"
-                            desc="Step-by-step execution with clear dependency chains"
-                            example="A → B → C → D"
-                        />
-                        <PatternCard
-                            title="Parallel Operations"
-                            icon="⚡"
-                            desc="Concurrent execution with synchronization points"
-                            example="A → [B,C,D] → E"
-                        />
-                        <PatternCard
-                            title="Pub/Sub Events"
-                            icon="📢"
-                            desc="Event-driven architecture with publisher-subscriber patterns"
-                            example="A → Event → [B,C,D]"
-                        />
-                        <PatternCard
-                            title="Fire & Forget"
-                            icon="🚀"
-                            desc="Asynchronous operations that don't block the main flow"
-                            example="A → B (async) + C"
                         />
                     </div>
                 </div>
@@ -276,21 +334,5 @@ const FeatureCard: React.FC<{
         </div>
         <h3 className="text-xl font-bold mb-4 text-gray-800">{title}</h3>
         <p className="text-gray-600 leading-relaxed">{desc}</p>
-    </div>
-);
-
-const PatternCard: React.FC<{
-    title: string;
-    icon: string;
-    desc: string;
-    example: string;
-}> = ({ title, icon, desc, example }) => (
-    <div className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100">
-        <div className="text-3xl mb-4">{icon}</div>
-        <h3 className="text-lg font-bold mb-2 text-gray-800">{title}</h3>
-        <p className="text-gray-600 text-sm mb-4">{desc}</p>
-        <div className="bg-gray-100 rounded-lg p-3">
-            <code className="text-xs font-mono text-gray-700">{example}</code>
-        </div>
     </div>
 );
