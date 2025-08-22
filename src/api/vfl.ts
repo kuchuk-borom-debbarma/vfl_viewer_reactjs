@@ -1,29 +1,32 @@
-import { Block, LogEntry, LogsResponse } from "../types";
-import { CONFIG } from "../config/config";
-
-const API_BASE = "http://localhost:8080/api/v1";
+import { Block, LogsResponse } from "../types";
+import { CONFIG, ROUTES } from "../config/constants";
+import { getApiUrl } from "../utils";
 
 const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data?: any) => {
     const timestamp = new Date().toISOString();
-    const style = type === 'REQUEST' ? 'color: blue; font-weight: bold;' :
-        type === 'RESPONSE' ? 'color: green; font-weight: bold;' :
-            'color: red; font-weight: bold;';
+    const styles = {
+        REQUEST: 'color: blue; font-weight: bold;',
+        RESPONSE: 'color: green; font-weight: bold;',
+        ERROR: 'color: red; font-weight: bold;'
+    };
 
-    console.log(`%c[${timestamp}] ${type}: ${endpoint}`, style);
-    if (data) {
-        console.log('Data:', data);
-    }
+    console.log(`%c[${timestamp}] ${type}: ${endpoint}`, styles[type]);
+    if (data) console.log('Data:', data);
 };
 
 const apiFetch = async <T>(endpoint: string): Promise<T> => {
     debugLog('REQUEST', endpoint);
 
     try {
-        const res = await fetch(`${API_BASE}${endpoint}`);
+        const res = await fetch(getApiUrl(endpoint));
 
         if (!res.ok) {
             const errorText = await res.text();
-            debugLog('ERROR', endpoint, { status: res.status, statusText: res.statusText, error: errorText });
+            debugLog('ERROR', endpoint, {
+                status: res.status,
+                statusText: res.statusText,
+                error: errorText
+            });
             throw new Error(`API error: ${res.statusText} - ${errorText}`);
         }
 
@@ -36,23 +39,24 @@ const apiFetch = async <T>(endpoint: string): Promise<T> => {
     }
 };
 
-export const getRootBlocks = (limit = CONFIG.DEFAULT_PAGE_SIZE, cursor?: string): Promise<Block[]> => {
+export const getRootBlocks = (
+    limit = CONFIG.DEFAULT_PAGE_SIZE,
+    cursor?: string
+): Promise<Block[]> => {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (cursor) params.append("cursor", cursor);
-    const endpoint = `/root-blocks?${params}`;
-    return apiFetch<Block[]>(endpoint);
+    return apiFetch<Block[]>(`${ROUTES.ROOT_BLOCKS}?${params}`);
 };
 
 export const getLogsByBlockId = (
     blockId: string,
-    limit?: number,
+    limit = CONFIG.DEFAULT_PAGE_SIZE,
     cursor?: string
 ): Promise<LogsResponse> => {
     const params = new URLSearchParams({
         blockId,
-        limit: (limit || CONFIG.DEFAULT_PAGE_SIZE).toString(),
+        limit: limit.toString(),
     });
     if (cursor) params.append("cursor", cursor);
-    const endpoint = `/logs-by-blockid?${params}`;
-    return apiFetch<LogsResponse>(endpoint);
+    return apiFetch<LogsResponse>(`${ROUTES.LOGS_BY_BLOCK}?${params}`);
 };

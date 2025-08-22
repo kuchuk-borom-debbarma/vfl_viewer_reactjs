@@ -16,6 +16,7 @@ export interface LogEntry {
     logType: string;
     referencedBlock: Block | null;
     timestamp: number;
+    children?: LogEntry[];
 }
 
 export interface LogsResponse {
@@ -23,9 +24,12 @@ export interface LogsResponse {
     nextCursor: string | null;
 }
 
-export interface PaginationHook<T> {
-    items: T[];
-    loading: boolean;
-    error: string | null;
-    loadMore: () => void;
+export interface ViewState {
+    zoom: number;
+    pan: { x: number; y: number };
+    isDragging: boolean;
+    dragStart: { x: number; y: number };
 }
+
+export type InputMode = "mouse" | "trackpad";
+export type LogTypeVariant = "primary" | "secondary" | "warning" | "error" | "info";
