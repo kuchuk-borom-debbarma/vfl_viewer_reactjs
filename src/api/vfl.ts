@@ -1,7 +1,7 @@
 import { Block, LogEntry, LogsResponse } from "../types";
+import { CONFIG } from "../config/config";
 
 const API_BASE = "http://localhost:8080/api/v1";
-const DEFAULT_LIMIT = 5;
 
 const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data?: any) => {
     const timestamp = new Date().toISOString();
@@ -36,7 +36,7 @@ const apiFetch = async <T>(endpoint: string): Promise<T> => {
     }
 };
 
-export const getRootBlocks = (limit = DEFAULT_LIMIT, cursor?: string): Promise<Block[]> => {
+export const getRootBlocks = (limit = CONFIG.DEFAULT_PAGE_SIZE, cursor?: string): Promise<Block[]> => {
     const params = new URLSearchParams({ limit: limit.toString() });
     if (cursor) params.append("cursor", cursor);
     const endpoint = `/root-blocks?${params}`;
@@ -45,12 +45,12 @@ export const getRootBlocks = (limit = DEFAULT_LIMIT, cursor?: string): Promise<B
 
 export const getLogsByBlockId = (
     blockId: string,
-    limit = 20,
+    limit?: number,
     cursor?: string
 ): Promise<LogsResponse> => {
     const params = new URLSearchParams({
         blockId,
-        limit: limit.toString(),
+        limit: (limit || CONFIG.DEFAULT_PAGE_SIZE).toString(),
     });
     if (cursor) params.append("cursor", cursor);
     const endpoint = `/logs-by-blockid?${params}`;

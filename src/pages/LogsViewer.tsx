@@ -24,6 +24,10 @@ export default function LogsViewer({
     const [loadingReferencedBlocks, setLoadingReferencedBlocks] = useState<Set<string>>(new Set());
     const [referencedBlockData, setReferencedBlockData] = useState<Record<string, LogEntry[]>>({});
 
+    // New state for contextual load more functionality
+    const [referencedBlockCursors, setReferencedBlockCursors] = useState<Record<string, string | null>>({});
+    const [loadingMoreReferenced, setLoadingMoreReferenced] = useState<Set<string>>(new Set());
+
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -108,7 +112,7 @@ export default function LogsViewer({
         setLoading(true);
         setError(null);
         try {
-            const response = await getLogsByBlockId(block.id, 20);
+            const response = await getLogsByBlockId(block.id);
             setAllLogs(response.logs);
             setNextCursor(response.nextCursor);
             initializeCollapsedState(response.logs);
@@ -124,7 +128,7 @@ export default function LogsViewer({
 
         setLoadingMore(true);
         try {
-            const response = await getLogsByBlockId(block.id, 20, nextCursor);
+            const response = await getLogsByBlockId(block.id, undefined, nextCursor);
             setAllLogs(prev => [...prev, ...response.logs]);
             setNextCursor(response.nextCursor);
         } catch (err: any) {
@@ -162,10 +166,16 @@ export default function LogsViewer({
         setLoadingReferencedBlocks(prev => new Set([...prev, log.id]));
 
         try {
-            const response = await getLogsByBlockId(log.referencedBlock.id, 50);
+            const response = await getLogsByBlockId(log.referencedBlock.id);
             setReferencedBlockData(prev => ({
                 ...prev,
                 [log.id]: response.logs
+            }));
+
+            // Track the cursor for this referenced block
+            setReferencedBlockCursors(prev => ({
+                ...prev,
+                [log.id]: response.nextCursor
             }));
 
             setCollapsed(prev => {
@@ -185,10 +195,89 @@ export default function LogsViewer({
         }
     };
 
-    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number): JSX.Element[] => {
+    const loadMoreReferencedLogs = async (logId: string, referencedBlockId: string) => {
+        const cursor = referencedBlockCursors[logId];
+        if (!cursor) return;
+
+        setLoadingMoreReferenced(prev => new Set([...prev, logId]));
+
+        try {
+            const response = await getLogsByBlockId(referencedBlockId, undefined, cursor);
+
+            setReferencedBlockData(prev => ({
+                ...prev,
+                [logId]: [...(prev[logId] || []), ...response.logs]
+            }));
+
+            setReferencedBlockCursors(prev => ({
+                ...prev,
+                [logId]: response.nextCursor
+            }));
+
+        } catch (err: any) {
+            setError(`Failed to load more logs: ${err.message}`);
+        } finally {
+            setLoadingMoreReferenced(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(logId);
+                return newSet;
+            });
+        }
+    };
+
+    // Load More Button Component
+    const LoadMoreButton = ({
+                                onClick,
+                                loading,
+                                hasMore,
+                                label = "Load More Logs"
+                            }: {
+        onClick: () => void;
+        loading: boolean;
+        hasMore: boolean;
+        label?: string;
+    }) => {
+        if (!hasMore) return null;
+
+        return (
+            <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                margin: 'calc(var(--space) * 2) 0',
+                pointerEvents: 'auto' // Ensure button can be clicked
+            }}>
+                <button
+                    onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onClick();
+                    }}
+                    disabled={loading}
+                    style={{
+                        background: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '8px 16px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: loading ? 'not-allowed' : 'pointer',
+                        opacity: loading ? 0.7 : 1,
+                        transition: 'all 0.2s ease',
+                        pointerEvents: loading ? 'none' : 'auto',
+                        zIndex: 1000 // Ensure button is above canvas
+                    }}
+                >
+                    {loading ? '⏳ Loading...' : `📥 ${label}`}
+                </button>
+            </div>
+        );
+    };
+
+    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number, contextLogId?: string): JSX.Element[] => {
         if (!logs || logs.length === 0) return [];
 
-        return logs.flatMap((log, index) => {
+        const elements = logs.flatMap((log, index) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
             const hasReferencedBlock = !!log.referencedBlock;
@@ -197,11 +286,14 @@ export default function LogsViewer({
             const isSequential = hasChildren && log.children.length === 1;
 
             const currentParentTimestamp = index > 0 ? logs[index - 1].timestamp : parentTimestamp;
-            const elements: JSX.Element[] = [];
+            const logElements: JSX.Element[] = [];
 
             // 1. Always render the main log card
-            elements.push(
-                <div key={`${keyPrefix}-${log.id}-${index}`} style={{ position: 'relative' }}>
+            logElements.push(
+                <div key={`${keyPrefix}-${log.id}-${index}`} style={{
+                    position: 'relative',
+                    pointerEvents: 'auto' // Ensure log cards can be clicked
+                }}>
                     <LogCard
                         log={log}
                         collapsed={isCollapsed}
@@ -216,23 +308,36 @@ export default function LogsViewer({
             // 2. If has referenced block and expanded, show referenced content (NESTED)
             if (hasReferencedBlock && !isCollapsed && referencedBlockData[log.id]) {
                 const referencedTree = buildTree(referencedBlockData[log.id]);
-                elements.push(
+                logElements.push(
                     <div key={`${keyPrefix}-ref-${log.id}`} style={{
                         marginLeft: '30px',
                         marginTop: 'var(--space)',
                         paddingLeft: '15px',
                         borderLeft: '2px solid var(--primary)',
-                        opacity: 0.9
+                        opacity: 0.9,
+                        pointerEvents: 'auto'
                     }}>
-                        {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
+                        {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp, log.id)}
+
+                        {/* Load more button for this referenced block */}
+                        <LoadMoreButton
+                            onClick={() => loadMoreReferencedLogs(log.id, log.referencedBlock!.id)}
+                            loading={loadingMoreReferenced.has(log.id)}
+                            hasMore={!!referencedBlockCursors[log.id]}
+                            label="Load More Referenced Logs"
+                        />
                     </div>
                 );
             }
 
             // 3. Handle original children (SEQUENTIAL/PARALLEL)
             if (isParallel) {
-                elements.push(
-                    <div key={`${keyPrefix}-par-${log.id}`} style={{ marginTop: '16px', marginBottom: '16px' }}>
+                logElements.push(
+                    <div key={`${keyPrefix}-par-${log.id}`} style={{
+                        marginTop: '16px',
+                        marginBottom: '16px',
+                        pointerEvents: 'auto'
+                    }}>
                         <div style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -267,7 +372,8 @@ export default function LogsViewer({
                                     background: 'var(--bg)',
                                     border: '1px solid var(--border)',
                                     borderRadius: '8px',
-                                    position: 'relative'
+                                    position: 'relative',
+                                    pointerEvents: 'auto'
                                 }}>
                                     <div style={{
                                         position: 'absolute',
@@ -291,7 +397,7 @@ export default function LogsViewer({
                     </div>
                 );
             } else if (isSequential) {
-                elements.push(
+                logElements.push(
                     <div key={`connector-${log.id}`} style={{
                         width: '2px',
                         height: '8px',
@@ -300,15 +406,25 @@ export default function LogsViewer({
                         borderRadius: '1px'
                     }}/>
                 );
-                elements.push(...renderLogStructure(log.children!, depth, keyPrefix, log.timestamp));
+                logElements.push(...renderLogStructure(log.children!, depth, keyPrefix, log.timestamp));
             }
 
-            return elements;
+            return logElements;
         });
+
+        return elements;
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
+        // Only start dragging if clicking on the canvas background, not on interactive elements
         if (e.button !== 0) return;
+        const target = e.target as HTMLElement;
+
+        // Don't start dragging if clicking on buttons, cards, or other interactive elements
+        if (target.closest('button') || target.closest('.card') || target.closest('[data-interactive]')) {
+            return;
+        }
+
         e.stopPropagation();
         setIsDragging(true);
         setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
@@ -459,7 +575,8 @@ export default function LogsViewer({
                     cursor: isDragging ? 'grabbing' : 'grab',
                     position: 'relative',
                     marginLeft: sidebarOpen ? '300px' : '0',
-                    transition: 'margin-left 0.3s ease'
+                    transition: 'margin-left 0.3s ease',
+                    pointerEvents: 'auto'
                 }}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -471,7 +588,8 @@ export default function LogsViewer({
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                         transformOrigin: '0 0',
                         padding: 'calc(var(--space) * 4)',
-                        minHeight: '100%'
+                        minHeight: '100%',
+                        pointerEvents: 'auto'
                     }}
                 >
                     <div className="container">
@@ -479,46 +597,17 @@ export default function LogsViewer({
                             ? <div className="text-center muted">No logs found for this block.</div>
                             : renderLogStructure(treeStructure)
                         }
+
+                        {/* Main block load more button */}
+                        <LoadMoreButton
+                            onClick={loadMoreLogs}
+                            loading={loadingMore}
+                            hasMore={!!nextCursor}
+                            label="Load More Main Logs"
+                        />
                     </div>
                 </div>
             </div>
-
-            {/* Fixed Load More Button - Bottom Right Corner */}
-            {nextCursor && (
-                <button
-                    onClick={loadMoreLogs}
-                    disabled={loadingMore}
-                    style={{
-                        position: 'fixed',
-                        bottom: '20px',
-                        right: '20px',
-                        background: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 20px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        cursor: loadingMore ? 'not-allowed' : 'pointer',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
-                        zIndex: 1020,
-                        transition: 'all 0.3s ease',
-                        opacity: loadingMore ? 0.7 : 1
-                    }}
-                    onMouseEnter={(e) => {
-                        if (!loadingMore) {
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
-                    }}
-                >
-                    {loadingMore ? '⏳ Loading...' : '📥 Load More'}
-                </button>
-            )}
 
             <div style={{
                 borderTop: '1px solid var(--border)',

@@ -47,7 +47,7 @@ const LogCard = memo(({ log, collapsed, loadingReferenced, onToggleExpand, onNav
                                 transition: 'all 0.2s ease'
                             }}
                         >
-                            {loadingReferenced ? "⏳" : "▶"}
+                            {loadingReferenced ? "⏳" : (collapsed ? "▶" : "▼")}
                         </button>
                     )}
 
