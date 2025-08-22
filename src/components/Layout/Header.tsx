@@ -36,10 +36,10 @@ export const Header: React.FC<HeaderProps> = ({
                                               }) => {
     return (
         <div
-            className="container mx-auto px-6 py-4 transition-all duration-300"
+            className="max-w-6xl mx-auto px-6 py-4 transition-all duration-300"
             style={{ marginLeft: sidebarOpen ? '300px' : '0' }}
         >
-            <div className="flex justify-between items-center gap-4">
+            <div className="flex justify-between items-center gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
                     <Button variant="outline" onClick={onBack}>
                         ← Back
@@ -47,14 +47,14 @@ export const Header: React.FC<HeaderProps> = ({
 
                     <button
                         onClick={onToggleSidebar}
-                        className="w-10 h-10 rounded-lg border border-gray-300 bg-white text-primary text-lg flex items-center justify-center shadow-sm hover:shadow-md transition-all duration-300 z-50"
+                        className="w-10 h-10 rounded-lg border border-gray-300 bg-white text-blue-600 text-lg flex items-center justify-center shadow-sm hover:shadow-md hover:bg-blue-50 transition-all duration-300 z-50"
                         title={sidebarOpen ? "Hide block info" : "Show block info"}
                     >
                         {sidebarOpen ? '◀' : 'ℹ️'}
                     </button>
 
                     <h2 className="text-2xl font-semibold text-gray-800">
-                        Execution Flow: <span className="text-primary">{block.name}</span>
+                        Execution Flow: <span className="text-blue-600">{block.name}</span>
                     </h2>
                 </div>
 

@@ -13,24 +13,26 @@ export const Button: React.FC<ButtonProps> = ({
                                                   children,
                                                   ...props
                                               }) => {
-    const baseStyles = 'btn transition-all duration-200 font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-primary';
+    const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+
     const variants = {
-        primary: 'bg-primary text-white hover:bg-primary-dark',
-        outline: 'bg-transparent border border-primary text-primary hover:bg-blue-50',
-        ghost: 'bg-transparent text-gray-600 hover:text-primary hover:bg-gray-50'
+        primary: 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm hover:shadow-md',
+        outline: 'bg-transparent border border-blue-600 text-blue-600 hover:bg-blue-50 shadow-sm',
+        ghost: 'bg-transparent text-gray-600 hover:text-blue-600 hover:bg-gray-50'
     };
+
     const sizes = {
         sm: 'px-3 py-1.5 text-sm',
-        md: 'px-4 py-2',
+        md: 'px-4 py-2 text-base',
         lg: 'px-6 py-3 text-lg'
     };
 
     return (
         <button
             className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
-    {...props}
->
-    {children}
-    </button>
-);
+            {...props}
+        >
+            {children}
+        </button>
+    );
 };

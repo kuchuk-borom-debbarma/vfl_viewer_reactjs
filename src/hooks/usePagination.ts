@@ -51,17 +51,19 @@ export function usePagination<T extends PaginatedItem>({
     }, [fetchFn, pageSize, cursor]);
 
     const loadMore = useCallback(() => load(true), [load]);
+
     const refresh = useCallback(() => {
         setCursor(undefined);
         setHasMore(true);
+        setItems([]);
         load(false);
     }, [load]);
 
     useEffect(() => {
-        if (autoLoad) {
-            load();
+        if (autoLoad && items.length === 0) {
+            load(false);
         }
-    }, [autoLoad, load]);
+    }, [autoLoad]); // Removed 'load' from dependencies
 
     return {
         items,
