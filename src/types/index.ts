@@ -16,8 +16,11 @@ export interface LogEntry {
     logType: string;
     referencedBlock: Block | null;
     timestamp: number;
-    cursor: string;
-    children: LogEntry[];
+}
+
+export interface LogsResponse {
+    logs: LogEntry[];
+    nextCursor: string | null;
 }
 
 export interface PaginationHook<T> {

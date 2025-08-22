@@ -1,10 +1,8 @@
-
-import {Block, LogEntry} from "../types";
+import { Block, LogEntry, LogsResponse } from "../types";
 
 const API_BASE = "http://localhost:8080/api/v1";
 const DEFAULT_LIMIT = 5;
 
-// Debug logging utility
 const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data?: any) => {
     const timestamp = new Date().toISOString();
     const style = type === 'REQUEST' ? 'color: blue; font-weight: bold;' :
@@ -47,16 +45,14 @@ export const getRootBlocks = (limit = DEFAULT_LIMIT, cursor?: string): Promise<B
 
 export const getLogsByBlockId = (
     blockId: string,
-    maxDepth: number,
-    maxChildren: number,
+    limit = 20,
     cursor?: string
-): Promise<LogEntry[]> => {
+): Promise<LogsResponse> => {
     const params = new URLSearchParams({
         blockId,
-        maxDepth: maxDepth.toString(),
-        maxChildren: maxChildren.toString(),
+        limit: limit.toString(),
     });
     if (cursor) params.append("cursor", cursor);
     const endpoint = `/logs-by-blockid?${params}`;
-    return apiFetch<LogEntry[]>(endpoint);
+    return apiFetch<LogsResponse>(endpoint);
 };

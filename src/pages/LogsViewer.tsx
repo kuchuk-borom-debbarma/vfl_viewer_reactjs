@@ -5,7 +5,6 @@ import ControlsBar from "../components/ControlsBar";
 import { LogCard } from "../components/LogCard";
 import { Block, LogEntry } from "../types";
 import { getLogsByBlockId } from "../api/vfl";
-import { getTrimmedId } from "../utils/formatters";
 
 export default function LogsViewer({
                                        block,
@@ -16,13 +15,13 @@ export default function LogsViewer({
     goBack: () => void;
     onNavigateToBlock?: (block: Block) => void;
 }) {
-    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [nextCursor, setNextCursor] = useState<string | null>(null);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
     const [loadingReferencedBlocks, setLoadingReferencedBlocks] = useState<Set<string>>(new Set());
-
-    // SIMPLE: Store referenced block data separately - don't touch original data!
     const [referencedBlockData, setReferencedBlockData] = useState<Record<string, LogEntry[]>>({});
 
     const [zoom, setZoom] = useState(1);
@@ -33,6 +32,41 @@ export default function LogsViewer({
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const canvasRef = useRef<HTMLDivElement>(null);
+
+    // Build tree structure from flat logs
+    const buildTree = (logs: LogEntry[]): LogEntry[] => {
+        // Sort logs by timestamp, then by ID
+        const sortedLogs = [...logs].sort((a, b) => {
+            if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
+            return a.id.localeCompare(b.id);
+        });
+
+        // Create parent-child map
+        const childrenMap = new Map<string, LogEntry[]>();
+        const rootLogs: LogEntry[] = [];
+
+        sortedLogs.forEach(log => {
+            if (log.parentLogId === null) {
+                rootLogs.push(log);
+            } else {
+                if (!childrenMap.has(log.parentLogId)) {
+                    childrenMap.set(log.parentLogId, []);
+                }
+                childrenMap.get(log.parentLogId)!.push(log);
+            }
+        });
+
+        // Recursively attach children
+        const attachChildren = (log: LogEntry): LogEntry => {
+            const children = childrenMap.get(log.id) || [];
+            return {
+                ...log,
+                children: children.map(attachChildren)
+            };
+        };
+
+        return rootLogs.map(attachChildren);
+    };
 
     useEffect(() => {
         loadLogs();
@@ -74,9 +108,10 @@ export default function LogsViewer({
         setLoading(true);
         setError(null);
         try {
-            const logsData = await getLogsByBlockId(block.id, 10, 50);
-            setLogs(logsData);
-            initializeCollapsedState(logsData);
+            const response = await getLogsByBlockId(block.id, 20);
+            setAllLogs(response.logs);
+            setNextCursor(response.nextCursor);
+            initializeCollapsedState(response.logs);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -84,15 +119,26 @@ export default function LogsViewer({
         }
     };
 
+    const loadMoreLogs = async () => {
+        if (!nextCursor || loadingMore) return;
+
+        setLoadingMore(true);
+        try {
+            const response = await getLogsByBlockId(block.id, 20, nextCursor);
+            setAllLogs(prev => [...prev, ...response.logs]);
+            setNextCursor(response.nextCursor);
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+
     const initializeCollapsedState = (logs: LogEntry[]) => {
         const referencedBlocks = new Set<string>();
-        const findReferencedBlocks = (entries: LogEntry[]) => {
-            entries.forEach(log => {
-                if (log.referencedBlock) referencedBlocks.add(log.id);
-                if (log.children?.length) findReferencedBlocks(log.children);
-            });
-        };
-        findReferencedBlocks(logs);
+        logs.forEach(log => {
+            if (log.referencedBlock) referencedBlocks.add(log.id);
+        });
         setCollapsed(referencedBlocks);
     };
 
@@ -105,11 +151,9 @@ export default function LogsViewer({
         });
     };
 
-    // SIMPLE: Load referenced block data without touching original structure
     const handleExpandReferencedBlock = async (log: LogEntry) => {
         if (!log.referencedBlock) return;
 
-        // If already loaded, just toggle collapse
         if (referencedBlockData[log.id]) {
             toggleCollapse(log.id);
             return;
@@ -118,15 +162,12 @@ export default function LogsViewer({
         setLoadingReferencedBlocks(prev => new Set([...prev, log.id]));
 
         try {
-            const referencedLogs = await getLogsByBlockId(log.referencedBlock.id, 10, 50);
-
-            // Store in separate state - don't modify original data!
+            const response = await getLogsByBlockId(log.referencedBlock.id, 50);
             setReferencedBlockData(prev => ({
                 ...prev,
-                [log.id]: referencedLogs
+                [log.id]: response.logs
             }));
 
-            // Expand this log
             setCollapsed(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(log.id);
@@ -144,7 +185,6 @@ export default function LogsViewer({
         }
     };
 
-    // SIMPLE: Clear rendering logic
     const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number): JSX.Element[] => {
         if (!logs || logs.length === 0) return [];
 
@@ -175,6 +215,7 @@ export default function LogsViewer({
 
             // 2. If has referenced block and expanded, show referenced content (NESTED)
             if (hasReferencedBlock && !isCollapsed && referencedBlockData[log.id]) {
+                const referencedTree = buildTree(referencedBlockData[log.id]);
                 elements.push(
                     <div key={`${keyPrefix}-ref-${log.id}`} style={{
                         marginLeft: '30px',
@@ -183,14 +224,13 @@ export default function LogsViewer({
                         borderLeft: '2px solid var(--primary)',
                         opacity: 0.9
                     }}>
-                        {renderLogStructure(referencedBlockData[log.id], depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
+                        {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
                     </div>
                 );
             }
 
-            // 3. Handle original children (SEQUENTIAL/PARALLEL) - independent of referenced blocks
+            // 3. Handle original children (SEQUENTIAL/PARALLEL)
             if (isParallel) {
-                // Parallel children
                 elements.push(
                     <div key={`${keyPrefix}-par-${log.id}`} style={{ marginTop: '16px', marginBottom: '16px' }}>
                         <div style={{
@@ -215,7 +255,6 @@ export default function LogsViewer({
                                 marginLeft: 'var(--space)'
                             }}/>
                         </div>
-
                         <div style={{
                             display: 'grid',
                             gridTemplateColumns: `repeat(${log.children!.length}, 1fr)`,
@@ -252,7 +291,6 @@ export default function LogsViewer({
                     </div>
                 );
             } else if (isSequential) {
-                // Sequential children - render at SAME level with connector
                 elements.push(
                     <div key={`connector-${log.id}`} style={{
                         width: '2px',
@@ -262,7 +300,6 @@ export default function LogsViewer({
                         borderRadius: '1px'
                     }}/>
                 );
-                // Continue the sequence at same level
                 elements.push(...renderLogStructure(log.children!, depth, keyPrefix, log.timestamp));
             }
 
@@ -270,7 +307,6 @@ export default function LogsViewer({
         });
     };
 
-    // Rest of the event handlers remain the same
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return;
         e.stopPropagation();
@@ -301,13 +337,9 @@ export default function LogsViewer({
     const expandAll = () => setCollapsed(new Set());
     const collapseAll = () => {
         const allReferencedBlocks = new Set<string>();
-        const findReferencedBlocks = (logs: LogEntry[]) => {
-            logs.forEach(log => {
-                if (log.referencedBlock) allReferencedBlocks.add(log.id);
-                if (log.children) findReferencedBlocks(log.children);
-            });
-        };
-        findReferencedBlocks(logs);
+        allLogs.forEach(log => {
+            if (log.referencedBlock) allReferencedBlocks.add(log.id);
+        });
         setCollapsed(allReferencedBlocks);
     };
 
@@ -342,6 +374,8 @@ export default function LogsViewer({
             </div>
         );
     }
+
+    const treeStructure = buildTree(allLogs);
 
     return (
         <div style={{
@@ -441,13 +475,50 @@ export default function LogsViewer({
                     }}
                 >
                     <div className="container">
-                        {logs.length === 0
+                        {treeStructure.length === 0
                             ? <div className="text-center muted">No logs found for this block.</div>
-                            : renderLogStructure(logs)
+                            : renderLogStructure(treeStructure)
                         }
                     </div>
                 </div>
             </div>
+
+            {/* Fixed Load More Button - Bottom Right Corner */}
+            {nextCursor && (
+                <button
+                    onClick={loadMoreLogs}
+                    disabled={loadingMore}
+                    style={{
+                        position: 'fixed',
+                        bottom: '20px',
+                        right: '20px',
+                        background: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '12px',
+                        padding: '12px 20px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: loadingMore ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                        zIndex: 1020,
+                        transition: 'all 0.3s ease',
+                        opacity: loadingMore ? 0.7 : 1
+                    }}
+                    onMouseEnter={(e) => {
+                        if (!loadingMore) {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.3)';
+                        }
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.2)';
+                    }}
+                >
+                    {loadingMore ? '⏳ Loading...' : '📥 Load More'}
+                </button>
+            )}
 
             <div style={{
                 borderTop: '1px solid var(--border)',
