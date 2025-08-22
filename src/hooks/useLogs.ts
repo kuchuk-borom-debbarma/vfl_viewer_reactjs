@@ -87,6 +87,41 @@ export const useLogs = (block: Block) => {
         }
     }, [referencedBlockData]);
 
+    // NEW: Load more referenced logs function
+    const loadMoreReferencedLogs = useCallback(async (logId: string, referencedBlockId: string) => {
+        const cursor = referencedCursors[logId];
+        if (!cursor) return;
+
+        setLoadingMoreReferenced(prev => new Set([...prev, logId]));
+
+        try {
+            const response = await getLogsByBlockId(referencedBlockId, CONFIG.DEFAULT_PAGE_SIZE, cursor);
+
+            setReferencedBlockData(prev => ({
+                ...prev,
+                [logId]: [...(prev[logId] || []), ...response.logs]
+            }));
+
+            setReferencedCursors(prev => ({
+                ...prev,
+                [logId]: response.nextCursor
+            }));
+
+            setHasMoreReferenced(prev => ({
+                ...prev,
+                [logId]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
+            }));
+        } catch (err: any) {
+            setError(`Failed to load more referenced logs: ${err.message}`);
+        } finally {
+            setLoadingMoreReferenced(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(logId);
+                return newSet;
+            });
+        }
+    }, [referencedCursors]);
+
     const toggleCollapse = useCallback((logId: string) => {
         setCollapsed(prev => {
             const newCollapsed = new Set(prev);
@@ -123,6 +158,7 @@ export const useLogs = (block: Block) => {
         loadReferencedBlock,
         toggleCollapse,
         expandAll,
-        collapseAll
+        collapseAll,
+        loadMoreReferencedLogs  // NEW: Added this function
     };
 };

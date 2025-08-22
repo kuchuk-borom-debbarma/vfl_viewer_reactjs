@@ -37,7 +37,8 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
         loadMore,
         loadReferencedBlock,
         expandAll,
-        collapseAll
+        collapseAll,
+        loadMoreReferencedLogs  // NEW: Use the actual function from the hook
     } = useLogs(block);
 
     const {
@@ -53,11 +54,6 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
         zoomIn,
         zoomOut
     } = useViewport();
-
-    const loadMoreReferencedLogs = async (logId: string, referencedBlockId: string) => {
-        // This would need to be implemented in useLogs hook
-        console.log('Load more referenced logs', logId, referencedBlockId);
-    };
 
     if (loading) {
         return (
@@ -132,7 +128,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
                         hasMoreReferencedLogs={hasMoreReferenced}
                         onToggleExpand={loadReferencedBlock}
                         onNavigateToBlock={onNavigateToBlock}
-                        onLoadMoreReferenced={loadMoreReferencedLogs}
+                        onLoadMoreReferenced={loadMoreReferencedLogs}  // FIXED: Using actual function now
                     />
                 )}
 
