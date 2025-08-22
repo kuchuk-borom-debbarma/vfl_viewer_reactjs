@@ -1,5 +1,4 @@
 import React from 'react';
-import { Button } from './Button';
 
 interface LoadingButtonProps {
     onClick: () => void;
@@ -16,30 +15,32 @@ export const LoadingButton: React.FC<LoadingButtonProps> = ({
                                                                 loading,
                                                                 hasMore,
                                                                 label = 'Load More',
-                                                                icon = '🔥',
-                                                                variant = 'primary',
-                                                                size = 'md'
+                                                                icon = '+',
+                                                                variant = 'outline',
+                                                                size = 'sm'
                                                             }) => {
     if (!hasMore) return null;
 
+    const sizeClasses = {
+        sm: 'px-3 py-1.5 text-xs',
+        md: 'px-4 py-2 text-sm',
+        lg: 'px-6 py-3 text-base'
+    };
+
     return (
         <div className="flex justify-center my-4">
-            <Button
+            <button
                 onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     onClick();
                 }}
                 disabled={loading}
-                variant={variant}
-                size={size}
-                className="flex items-center gap-2"
+                className={`${sizeClasses[size]} bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all duration-200 flex items-center gap-2`}
             >
-        <span className="text-sm">
-          {loading ? '⏳' : icon}
-        </span>
+                <span>{loading ? '⋯' : icon}</span>
                 <span>{loading ? 'Loading...' : label}</span>
-            </Button>
+            </button>
         </div>
     );
 };

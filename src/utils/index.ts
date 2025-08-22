@@ -66,31 +66,4 @@ export const getLogTypeBadge = (logType: string) => {
     return badges[logType] || { text: 'Unknown', color: LOG_COLORS.info };
 };
 
-// Tree utilities
-export const buildLogTree = (logs: LogEntry[]): LogEntry[] => {
-    const sortedLogs = [...logs].sort((a, b) => {
-        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
-        return a.id.localeCompare(b.id);
-    });
-
-    const childrenMap = new Map<string, LogEntry[]>();
-    const rootLogs: LogEntry[] = [];
-
-    sortedLogs.forEach(log => {
-        if (log.parentLogId === null) {
-            rootLogs.push(log);
-        } else {
-            if (!childrenMap.has(log.parentLogId)) {
-                childrenMap.set(log.parentLogId, []);
-            }
-            childrenMap.get(log.parentLogId)!.push(log);
-        }
-    });
-
-    const attachChildren = (log: LogEntry): LogEntry => {
-        const children = childrenMap.get(log.id) || [];
-        return { ...log, children: children.map(attachChildren) };
-    };
-
-    return rootLogs.map(attachChildren);
-};
+// REMOVED: buildLogTree function - we now handle this directly in LogTree component

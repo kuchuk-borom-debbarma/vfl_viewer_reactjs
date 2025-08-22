@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Block } from '../types';
 import { useLogs } from '../hooks/useLogs';
 import { useViewport } from '../hooks/useViewport';
-import { buildLogTree } from '../utils';
 import { Sidebar } from '../components/Layout/Sidebar';
 import { Header } from '../components/Layout/Header';
 import { Viewport } from '../components/Layout/Viewport';
@@ -38,7 +37,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
         loadReferencedBlock,
         expandAll,
         collapseAll,
-        loadMoreReferencedLogs  // NEW: Use the actual function from the hook
+        loadMoreReferencedLogs
     } = useLogs(block);
 
     const {
@@ -57,11 +56,11 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-24">
-                <div className="container mx-auto px-6">
-                    <button onClick={goBack} className="btn btn-outline mb-6">← Back</button>
-                    <h2 className="text-2xl font-semibold text-center mb-8">Loading logs for {block.name}</h2>
-                    <div className="text-center text-gray-500">Loading execution logs...</div>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="text-2xl mb-4">⋯</div>
+                    <div className="text-lg font-medium text-gray-800 mb-2">Loading execution logs</div>
+                    <div className="text-sm text-gray-600">{block.name}</div>
                 </div>
             </div>
         );
@@ -69,20 +68,24 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
 
     if (error) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-24">
-                <div className="container mx-auto px-6">
-                    <button onClick={goBack} className="btn btn-outline mb-6">← Back</button>
-                    <h2 className="text-2xl font-semibold text-center mb-8">Execution Logs</h2>
-                    <div className="text-center text-red-500">{error}</div>
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="text-center max-w-md">
+                    <div className="text-2xl mb-4 text-red-500">✕</div>
+                    <div className="text-lg font-medium text-gray-800 mb-2">Failed to load logs</div>
+                    <div className="text-sm text-gray-600 mb-4">{error}</div>
+                    <button
+                        onClick={goBack}
+                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                        ← Go Back
+                    </button>
                 </div>
             </div>
         );
     }
 
-    const treeStructure = buildLogTree(allLogs);
-
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+        <div className="min-h-screen bg-gray-50 flex flex-col">
             <Sidebar
                 block={block}
                 isOpen={sidebarOpen}
@@ -114,47 +117,61 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
                 onUpdateDrag={updateDrag}
                 onEndDrag={endDrag}
             >
-                {treeStructure.length === 0 ? (
+                {allLogs.length === 0 ? (
                     <div className="text-center text-gray-500 py-20">
-                        No logs found for this block.
+                        <div className="text-2xl mb-4">📋</div>
+                        <div className="text-lg font-medium mb-2">No logs found</div>
+                        <div className="text-sm">This block doesn't contain any execution logs yet.</div>
                     </div>
                 ) : (
-                    <LogTree
-                        logs={treeStructure}
-                        collapsed={collapsed}
-                        loadingReferenced={loadingReferenced}
-                        referencedBlockData={referencedBlockData}
-                        loadingMoreReferenced={loadingMoreReferenced}
-                        hasMoreReferencedLogs={hasMoreReferenced}
-                        onToggleExpand={loadReferencedBlock}
-                        onNavigateToBlock={onNavigateToBlock}
-                        onLoadMoreReferenced={loadMoreReferencedLogs}  // FIXED: Using actual function now
-                    />
-                )}
+                    <>
+                        {/* Pass flat logs directly - LogTree handles the hierarchical rendering */}
+                        <LogTree
+                            logs={allLogs}
+                            collapsed={collapsed}
+                            loadingReferenced={loadingReferenced}
+                            referencedBlockData={referencedBlockData}
+                            loadingMoreReferenced={loadingMoreReferenced}
+                            hasMoreReferencedLogs={hasMoreReferenced}
+                            onToggleExpand={loadReferencedBlock}
+                            onNavigateToBlock={onNavigateToBlock}
+                            onLoadMoreReferenced={loadMoreReferencedLogs}
+                        />
 
-                <LoadingButton
-                    onClick={loadMore}
-                    loading={loadingMore}
-                    hasMore={hasMore}
-                    label="Load More Main Logs"
-                    icon="🔥"
-                />
+                        <LoadingButton
+                            onClick={loadMore}
+                            loading={loadingMore}
+                            hasMore={hasMore}
+                            label="Load More Logs"
+                            icon="+"
+                        />
+                    </>
+                )}
             </Viewport>
 
-            {/* Footer */}
+            {/* Minimal Footer */}
             <div
                 className="border-t border-gray-200 py-3 bg-white text-xs text-gray-500 transition-all duration-300"
                 style={{ marginLeft: sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0' }}
             >
-                <div className="container mx-auto px-6 flex justify-between items-center flex-wrap gap-4">
-                    <div className="flex gap-6">
-                        <span>🔗 Referenced Block</span>
-                        <span>📋 Referenced Block Logs</span>
-                        <span>👥 Sibling Operations</span>
-                        <span>⚡ Parallel Execution</span>
-                        <span>⬇️ Sequential Flow</span>
+                <div className="max-w-6xl mx-auto px-6 flex justify-between items-center">
+                    <div className="flex items-center gap-6">
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-blue-200 rounded-full"></div>
+                            Referenced Block
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
+                            Parallel Operations
+                        </span>
+                        <span className="flex items-center gap-1">
+                            <div className="w-2 h-2 bg-green-200 rounded-full"></div>
+                            Sequential Flow
+                        </span>
                     </div>
-                    <div>Ctrl/Cmd + scroll to zoom • Drag to pan • Horizontal scroll for siblings</div>
+                    <div className="hidden sm:block">
+                        Drag to pan • Scroll to zoom • Click logs for details
+                    </div>
                 </div>
             </div>
         </div>
