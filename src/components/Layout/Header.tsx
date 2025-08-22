@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '../UI/Button';
 import { Block } from '../../types';
-import { ControlsBar } from '../Controls/ControlsBar';
 import { InputMode } from '../../types';
 
 interface HeaderProps {
@@ -17,6 +16,7 @@ interface HeaderProps {
     onCollapseAll: () => void;
     inputMode: InputMode;
     onInputModeChange: (mode: InputMode) => void;
+    returnLabel?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -31,7 +31,8 @@ export const Header: React.FC<HeaderProps> = ({
                                                   onExpandAll,
                                                   onCollapseAll,
                                                   inputMode,
-                                                  onInputModeChange
+                                                  onInputModeChange,
+                                                  returnLabel = 'Back'
                                               }) => {
     return (
         <div className="bg-white border-b border-gray-200">
@@ -42,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <div className="flex justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
                         <Button variant="ghost" onClick={onBack} className="text-gray-600">
-                            ← Back
+                            ← {returnLabel}
                         </Button>
 
                         <button

@@ -14,9 +14,9 @@ export const Operations: React.FC = () => {
     const { items: blocks, loading, error, hasMore, nextCursor } = useBlocks(cursor);
 
     const handleNavigateToBlock = (block: Block) => {
+        // Simple navigation - browser will remember this in history
         navigate(`/logs/${block.id}`);
     };
-
     const handleNext = () => {
         if (nextCursor) {
             navigate(`/operations?cursor=${encodeURIComponent(nextCursor)}`);
@@ -24,14 +24,13 @@ export const Operations: React.FC = () => {
     };
 
     const handlePrevious = () => {
-        navigate(-1);  // Use browser's back button functionality
+        navigate(-1);
     };
 
     const handleGoBack = () => {
         navigate('/');
     };
 
-    // Check if we can go back (not on first page and has browser history)
     const canGoBack = cursor && window.history.length > 1;
 
     return (
@@ -41,7 +40,7 @@ export const Operations: React.FC = () => {
                 <div className="max-w-6xl mx-auto px-6 py-4">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" onClick={handleGoBack} className="text-gray-600">
-                            ← Back
+                            ← Back to Home
                         </Button>
                         <div>
                             <h1 className="text-2xl font-bold text-gray-800">Operations</h1>
@@ -117,7 +116,6 @@ export const Operations: React.FC = () => {
                                 </Button>
                             )}
 
-                            {/* Show page info if we have cursor */}
                             {cursor && (
                                 <div className="text-xs text-gray-500 ml-4">
                                     Use browser back/forward to navigate between pages

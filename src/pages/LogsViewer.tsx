@@ -49,11 +49,13 @@ export const LogsViewer: React.FC = () => {
     } = useViewport();
 
     const handleNavigateToBlock = (block: Block) => {
+        // Simple navigation - no complex state
         navigate(`/logs/${block.id}`);
     };
 
     const handleGoBack = () => {
-        navigate('/operations');
+        // Just use browser's back button - it knows the context!
+        navigate(-1);
     };
 
     if (loading) {
@@ -79,7 +81,7 @@ export const LogsViewer: React.FC = () => {
                         onClick={handleGoBack}
                         className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                     >
-                        ← Go Back
+                        ← Back
                     </button>
                 </div>
             </div>
@@ -107,6 +109,7 @@ export const LogsViewer: React.FC = () => {
                 onCollapseAll={collapseAll}
                 inputMode={inputMode}
                 onInputModeChange={setInputMode}
+                returnLabel="Back"
             />
 
             <Viewport
@@ -127,7 +130,6 @@ export const LogsViewer: React.FC = () => {
                     </div>
                 ) : (
                     <>
-                        {/* Pass flat logs directly - LogTree handles the hierarchical rendering */}
                         <LogTree
                             logs={allLogs}
                             collapsed={collapsed}
@@ -151,7 +153,6 @@ export const LogsViewer: React.FC = () => {
                 )}
             </Viewport>
 
-            {/* Minimal Footer */}
             <div
                 className="border-t border-gray-200 py-3 bg-white text-xs text-gray-500 transition-all duration-300"
                 style={{ marginLeft: sidebarOpen ? `${SIDEBAR_WIDTH}px` : '0' }}
