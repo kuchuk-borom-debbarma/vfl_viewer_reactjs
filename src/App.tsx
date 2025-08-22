@@ -1,13 +1,15 @@
-import React, { useState } from "react";
-import {Landing} from "./pages/Landing";
-import {Operations} from "./pages/Operations";
-
-type Page = "landing" | "operations";
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import { Landing } from "./pages/Landing";
+import { Operations } from "./pages/Operations";
+import { LogsViewer } from "./pages/LogsViewer";
 
 export function App() {
-    const [page, setPage] = useState<Page>("landing");
-
-    return page === "operations"
-        ? <Operations goBack={() => setPage("landing")} />
-        : <Landing onShowOperations={() => setPage("operations")} />;
+    return (
+        <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/operations" element={<Operations />} />
+            <Route path="/logs/:blockId" element={<LogsViewer />} />
+        </Routes>
+    );
 }

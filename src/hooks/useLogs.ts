@@ -3,7 +3,8 @@ import { LogEntry, Block } from '../types';
 import { getLogsByBlockId } from '../api/vfl';
 import { CONFIG } from '../config/constants';
 
-export const useLogs = (block: Block) => {
+export const useLogs = (blockId: string) => {
+    const [block, setBlock] = useState<Block | null>(null);
     const [allLogs, setAllLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -19,14 +20,14 @@ export const useLogs = (block: Block) => {
     const [loadingMoreReferenced, setLoadingMoreReferenced] = useState<Set<string>>(new Set());
     const [hasMoreReferenced, setHasMoreReferenced] = useState<Record<string, boolean>>({});
 
-    const loadLogs = useCallback(async (append = false) => {
+    const loadBlockAndLogs = useCallback(async (append = false) => {
         const isInitial = !append;
         if (isInitial) setLoading(true); else setLoadingMore(true);
         setError(null);
 
         try {
             const response = await getLogsByBlockId(
-                block.id,
+                blockId,
                 CONFIG.DEFAULT_PAGE_SIZE,
                 append ? nextCursor : undefined
             );
@@ -36,6 +37,17 @@ export const useLogs = (block: Block) => {
             setHasMore(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
 
             if (isInitial) {
+                // Create a dummy block object from blockId since we don't have block endpoint
+                setBlock({
+                    id: blockId,
+                    name: `Block ${blockId.slice(-8)}`,
+                    createdAt: Date.now(),
+                    startTime: Date.now(),
+                    endTime: null,
+                    endMessage: null,
+                    cursor: blockId
+                });
+
                 // Initialize collapsed state for logs with referenced blocks
                 const referencedBlocks = new Set<string>();
                 response.logs.forEach(log => {
@@ -51,7 +63,7 @@ export const useLogs = (block: Block) => {
         } finally {
             if (isInitial) setLoading(false); else setLoadingMore(false);
         }
-    }, [block.id, nextCursor]);
+    }, [blockId, nextCursor]);
 
     const loadReferencedBlock = useCallback(async (log: LogEntry) => {
         if (!log.referencedBlock) return;
@@ -87,7 +99,6 @@ export const useLogs = (block: Block) => {
         }
     }, [referencedBlockData]);
 
-    // NEW: Load more referenced logs function
     const loadMoreReferencedLogs = useCallback(async (logId: string, referencedBlockId: string) => {
         const cursor = referencedCursors[logId];
         if (!cursor) return;
@@ -141,9 +152,14 @@ export const useLogs = (block: Block) => {
         setCollapsed(allReferencedBlocks);
     }, [allLogs]);
 
-    useEffect(() => { loadLogs(); }, [loadLogs]);
+    const loadMore = useCallback(() => loadBlockAndLogs(true), [loadBlockAndLogs]);
+
+    useEffect(() => {
+        loadBlockAndLogs();
+    }, [blockId]); // Only depend on blockId
 
     return {
+        block,
         allLogs,
         loading,
         loadingMore,
@@ -154,11 +170,11 @@ export const useLogs = (block: Block) => {
         referencedBlockData,
         loadingMoreReferenced,
         hasMoreReferenced,
-        loadMore: () => loadLogs(true),
+        loadMore,
         loadReferencedBlock,
         toggleCollapse,
         expandAll,
         collapseAll,
-        loadMoreReferencedLogs  // NEW: Added this function
+        loadMoreReferencedLogs
     };
 };

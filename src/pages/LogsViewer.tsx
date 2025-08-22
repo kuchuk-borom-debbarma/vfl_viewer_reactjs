@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Block } from '../types';
 import { useLogs } from '../hooks/useLogs';
 import { useViewport } from '../hooks/useViewport';
@@ -9,20 +10,13 @@ import { LogTree } from '../components/Logs/LogTree';
 import { LoadingButton } from '../components/UI/LoadingButton';
 import { SIDEBAR_WIDTH } from '../config/constants';
 
-interface LogsViewerProps {
-    block: Block;
-    goBack: () => void;
-    onNavigateToBlock?: (block: Block) => void;
-}
-
-export const LogsViewer: React.FC<LogsViewerProps> = ({
-                                                          block,
-                                                          goBack,
-                                                          onNavigateToBlock
-                                                      }) => {
+export const LogsViewer: React.FC = () => {
+    const { blockId } = useParams<{ blockId: string }>();
+    const navigate = useNavigate();
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const {
+        block,
         allLogs,
         loading,
         loadingMore,
@@ -38,7 +32,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
         expandAll,
         collapseAll,
         loadMoreReferencedLogs
-    } = useLogs(block);
+    } = useLogs(blockId!);
 
     const {
         viewState,
@@ -54,19 +48,27 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
         zoomOut
     } = useViewport();
 
+    const handleNavigateToBlock = (block: Block) => {
+        navigate(`/logs/${block.id}`);
+    };
+
+    const handleGoBack = () => {
+        navigate('/operations');
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <div className="text-2xl mb-4">⋯</div>
                     <div className="text-lg font-medium text-gray-800 mb-2">Loading execution logs</div>
-                    <div className="text-sm text-gray-600">{block.name}</div>
+                    <div className="text-sm text-gray-600">{blockId}</div>
                 </div>
             </div>
         );
     }
 
-    if (error) {
+    if (error || !block) {
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center max-w-md">
@@ -74,7 +76,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
                     <div className="text-lg font-medium text-gray-800 mb-2">Failed to load logs</div>
                     <div className="text-sm text-gray-600 mb-4">{error}</div>
                     <button
-                        onClick={goBack}
+                        onClick={handleGoBack}
                         className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                     >
                         ← Go Back
@@ -95,7 +97,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
             <Header
                 block={block}
                 sidebarOpen={sidebarOpen}
-                onBack={goBack}
+                onBack={handleGoBack}
                 onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
                 zoom={viewState.zoom}
                 onZoomIn={zoomIn}
@@ -134,7 +136,7 @@ export const LogsViewer: React.FC<LogsViewerProps> = ({
                             loadingMoreReferenced={loadingMoreReferenced}
                             hasMoreReferencedLogs={hasMoreReferenced}
                             onToggleExpand={loadReferencedBlock}
-                            onNavigateToBlock={onNavigateToBlock}
+                            onNavigateToBlock={handleNavigateToBlock}
                             onLoadMoreReferenced={loadMoreReferencedLogs}
                         />
 

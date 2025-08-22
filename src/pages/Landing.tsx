@@ -1,10 +1,13 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
-interface LandingProps {
-    onShowOperations: () => void;
-}
+export const Landing: React.FC = () => {
+    const navigate = useNavigate();
 
-export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
+    const handleShowOperations = () => {
+        navigate('/operations');
+    };
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
@@ -42,7 +45,7 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                     </p>
                     <div className="flex gap-4 justify-center flex-wrap">
                         <button
-                            onClick={onShowOperations}
+                            onClick={handleShowOperations}
                             className="px-6 py-3 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 transition-all duration-200 shadow-sm hover:shadow-md"
                         >
                             Explore Operations
@@ -235,7 +238,7 @@ export const Landing: React.FC<LandingProps> = ({ onShowOperations }) => {
                         Stop guessing how your code executes. Start seeing the complete picture.
                     </p>
                     <button
-                        onClick={onShowOperations}
+                        onClick={handleShowOperations}
                         className="px-8 py-4 bg-white text-gray-800 font-semibold rounded-lg shadow-lg hover:shadow-xl hover:bg-gray-50 transition-all duration-300"
                     >
                         Explore VFL Operations

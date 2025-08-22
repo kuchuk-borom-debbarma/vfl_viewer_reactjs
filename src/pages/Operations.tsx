@@ -1,33 +1,38 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Block } from "../types";
 import { useBlocks } from "../hooks/useBlocks";
-import { LogsViewer } from "./LogsViewer";
 import { Button } from "../components/UI/Button";
 import { Card } from "../components/UI/Card";
-import { LoadingButton } from "../components/UI/LoadingButton";
 import { formatDuration, getTrimmedId } from "../utils";
 
-interface OperationsProps {
-    goBack: () => void;
-}
+export const Operations: React.FC = () => {
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const cursor = searchParams.get('cursor') || undefined;
 
-export const Operations: React.FC<OperationsProps> = ({ goBack }) => {
-    const { items: blocks, loading, error, loadMore } = useBlocks();
-    const [selectedBlock, setSelectedBlock] = useState<Block | null>(null);
+    const { items: blocks, loading, error, hasMore, nextCursor } = useBlocks(cursor);
 
     const handleNavigateToBlock = (block: Block) => {
-        setSelectedBlock(block);
+        navigate(`/logs/${block.id}`);
     };
 
-    if (selectedBlock) {
-        return (
-            <LogsViewer
-                block={selectedBlock}
-                goBack={() => setSelectedBlock(null)}
-                onNavigateToBlock={handleNavigateToBlock}
-            />
-        );
-    }
+    const handleNext = () => {
+        if (nextCursor) {
+            navigate(`/operations?cursor=${encodeURIComponent(nextCursor)}`);
+        }
+    };
+
+    const handlePrevious = () => {
+        navigate(-1);  // Use browser's back button functionality
+    };
+
+    const handleGoBack = () => {
+        navigate('/');
+    };
+
+    // Check if we can go back (not on first page and has browser history)
+    const canGoBack = cursor && window.history.length > 1;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -35,13 +40,14 @@ export const Operations: React.FC<OperationsProps> = ({ goBack }) => {
             <div className="bg-white border-b border-gray-200">
                 <div className="max-w-6xl mx-auto px-6 py-4">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" onClick={goBack} className="text-gray-600">
+                        <Button variant="ghost" onClick={handleGoBack} className="text-gray-600">
                             ← Back
                         </Button>
                         <div>
                             <h1 className="text-2xl font-bold text-gray-800">Operations</h1>
                             <div className="text-sm text-gray-500">
                                 {blocks.length > 0 ? `${blocks.length} operations found` : 'Loading operations...'}
+                                {cursor && <span className="ml-2 text-blue-600">• Page {cursor.slice(-8)}</span>}
                             </div>
                         </div>
                     </div>
@@ -83,20 +89,40 @@ export const Operations: React.FC<OperationsProps> = ({ goBack }) => {
                                 <BlockCard
                                     key={block.id}
                                     block={block}
-                                    onClick={() => setSelectedBlock(block)}
+                                    onClick={() => handleNavigateToBlock(block)}
                                 />
                             ))}
                         </div>
 
-                        <div className="text-center mt-12">
-                            <LoadingButton
-                                onClick={loadMore}
-                                loading={loading}
-                                hasMore={true}
-                                label="Load More Operations"
-                                variant="outline"
-                                size="md"
-                            />
+                        {/* Pagination Controls */}
+                        <div className="flex justify-center items-center gap-4 mt-12">
+                            {canGoBack && (
+                                <Button
+                                    variant="outline"
+                                    onClick={handlePrevious}
+                                    className="flex items-center gap-2"
+                                >
+                                    ← Previous
+                                </Button>
+                            )}
+
+                            {hasMore && (
+                                <Button
+                                    variant="primary"
+                                    onClick={handleNext}
+                                    disabled={loading}
+                                    className="flex items-center gap-2"
+                                >
+                                    {loading ? 'Loading...' : 'Next →'}
+                                </Button>
+                            )}
+
+                            {/* Show page info if we have cursor */}
+                            {cursor && (
+                                <div className="text-xs text-gray-500 ml-4">
+                                    Use browser back/forward to navigate between pages
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
