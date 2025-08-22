@@ -5,6 +5,7 @@ import ControlsBar from "../components/ControlsBar";
 import { LogCard } from "../components/LogCard";
 import { Block, LogEntry } from "../types";
 import { getLogsByBlockId } from "../api/vfl";
+import { CONFIG } from "../config/config";
 
 export default function LogsViewer({
                                        block,
@@ -27,6 +28,10 @@ export default function LogsViewer({
     // New state for contextual load more functionality
     const [referencedBlockCursors, setReferencedBlockCursors] = useState<Record<string, string | null>>({});
     const [loadingMoreReferenced, setLoadingMoreReferenced] = useState<Set<string>>(new Set());
+
+    // NEW: State to track if more data is available
+    const [hasMoreMainLogs, setHasMoreMainLogs] = useState(true);
+    const [hasMoreReferencedLogs, setHasMoreReferencedLogs] = useState<Record<string, boolean>>({});
 
     const [zoom, setZoom] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -115,6 +120,10 @@ export default function LogsViewer({
             const response = await getLogsByBlockId(block.id);
             setAllLogs(response.logs);
             setNextCursor(response.nextCursor);
+
+            // Check if we got fewer logs than requested (meaning we've reached the end)
+            setHasMoreMainLogs(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
+
             initializeCollapsedState(response.logs);
         } catch (err: any) {
             setError(err.message);
@@ -124,13 +133,17 @@ export default function LogsViewer({
     };
 
     const loadMoreLogs = async () => {
-        if (!nextCursor || loadingMore) return;
+        if (!nextCursor || loadingMore || !hasMoreMainLogs) return;
 
         setLoadingMore(true);
         try {
             const response = await getLogsByBlockId(block.id, undefined, nextCursor);
             setAllLogs(prev => [...prev, ...response.logs]);
             setNextCursor(response.nextCursor);
+
+            // Update hasMore based on returned count and cursor
+            setHasMoreMainLogs(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
+
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -141,9 +154,15 @@ export default function LogsViewer({
     const initializeCollapsedState = (logs: LogEntry[]) => {
         const referencedBlocks = new Set<string>();
         logs.forEach(log => {
-            if (log.referencedBlock) referencedBlocks.add(log.id);
+            if (log.referencedBlock) {
+                referencedBlocks.add(log.id);
+            }
         });
         setCollapsed(referencedBlocks);
+        // Clear any stale referenced block data
+        setReferencedBlockData({});
+        setReferencedBlockCursors({});
+        setHasMoreReferencedLogs({});
     };
 
     const toggleCollapse = (logId: string) => {
@@ -178,6 +197,12 @@ export default function LogsViewer({
                 [log.id]: response.nextCursor
             }));
 
+            // Track if this referenced block has more data
+            setHasMoreReferencedLogs(prev => ({
+                ...prev,
+                [log.id]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
+            }));
+
             setCollapsed(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(log.id);
@@ -197,7 +222,7 @@ export default function LogsViewer({
 
     const loadMoreReferencedLogs = async (logId: string, referencedBlockId: string) => {
         const cursor = referencedBlockCursors[logId];
-        if (!cursor) return;
+        if (!cursor || !hasMoreReferencedLogs[logId]) return;
 
         setLoadingMoreReferenced(prev => new Set([...prev, logId]));
 
@@ -214,6 +239,12 @@ export default function LogsViewer({
                 [logId]: response.nextCursor
             }));
 
+            // Update hasMore for this referenced block
+            setHasMoreReferencedLogs(prev => ({
+                ...prev,
+                [logId]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
+            }));
+
         } catch (err: any) {
             setError(`Failed to load more logs: ${err.message}`);
         } finally {
@@ -225,26 +256,32 @@ export default function LogsViewer({
         }
     };
 
-    // Load More Button Component
+    // Enhanced Load More Button Component
     const LoadMoreButton = ({
                                 onClick,
                                 loading,
                                 hasMore,
-                                label = "Load More Logs"
+                                label = "Load More Logs",
+                                context = "main",
+                                blockName,
+                                isNested = false
                             }: {
         onClick: () => void;
         loading: boolean;
         hasMore: boolean;
         label?: string;
+        context?: "main" | "referenced";
+        blockName?: string;
+        isNested?: boolean;
     }) => {
         if (!hasMore) return null;
 
         return (
             <div style={{
                 display: 'flex',
-                justifyContent: 'center',
-                margin: 'calc(var(--space) * 2) 0',
-                pointerEvents: 'auto' // Ensure button can be clicked
+                justifyContent: isNested ? 'flex-start' : 'center',
+                margin: isNested ? '8px 0 4px 0' : 'calc(var(--space) * 2) 0',
+                pointerEvents: 'auto'
             }}>
                 <button
                     onClick={(e) => {
@@ -254,45 +291,62 @@ export default function LogsViewer({
                     }}
                     disabled={loading}
                     style={{
-                        background: 'var(--primary)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '8px',
-                        padding: '8px 16px',
-                        fontSize: '13px',
-                        fontWeight: '600',
+                        background: context === "referenced" ? '#f0f9ff' : 'var(--primary)',
+                        color: context === "referenced" ? 'var(--primary)' : 'white',
+                        border: context === "referenced" ? '1px solid var(--primary)' : 'none',
+                        borderRadius: '6px',
+                        padding: isNested ? '4px 8px' : '8px 16px',
+                        fontSize: isNested ? '11px' : '13px',
+                        fontWeight: '500',
                         cursor: loading ? 'not-allowed' : 'pointer',
                         opacity: loading ? 0.7 : 1,
                         transition: 'all 0.2s ease',
                         pointerEvents: loading ? 'none' : 'auto',
-                        zIndex: 1000 // Ensure button is above canvas
+                        zIndex: 1000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
                     }}
+                    title={blockName ? `Load more logs for ${blockName}` : label}
                 >
-                    {loading ? '⏳ Loading...' : `📥 ${label}`}
+                    {loading ? (
+                        <>
+                            <span style={{ fontSize: '10px' }}>⏳</span>
+                            <span>Loading...</span>
+                        </>
+                    ) : (
+                        <>
+                            <span style={{ fontSize: '10px' }}>
+                                {context === "referenced" ? '📋' : '📥'}
+                            </span>
+                            <span>{isNested ? 'More' : 'Load More'}</span>
+                        </>
+                    )}
                 </button>
             </div>
         );
     };
 
-    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number, contextLogId?: string): JSX.Element[] => {
+    // CORRECTED renderLogStructure - follows design philosophy exactly
+    const renderLogStructure = (logs: LogEntry[], depth = 0, keyPrefix = "root", parentTimestamp?: number): JSX.Element[] => {
         if (!logs || logs.length === 0) return [];
 
-        const elements = logs.flatMap((log, index) => {
+        const result: JSX.Element[] = [];
+
+        // Function to process a single log and all its sequential children
+        const processLog = (log: LogEntry, index: number) => {
             const isCollapsed = collapsed.has(log.id);
             const isLoadingReferenced = loadingReferencedBlocks.has(log.id);
             const hasReferencedBlock = !!log.referencedBlock;
             const hasChildren = log.children && log.children.length > 0;
-            const isParallel = hasChildren && log.children.length > 1;
-            const isSequential = hasChildren && log.children.length === 1;
 
             const currentParentTimestamp = index > 0 ? logs[index - 1].timestamp : parentTimestamp;
-            const logElements: JSX.Element[] = [];
 
             // 1. Always render the main log card
-            logElements.push(
+            result.push(
                 <div key={`${keyPrefix}-${log.id}-${index}`} style={{
                     position: 'relative',
-                    pointerEvents: 'auto' // Ensure log cards can be clicked
+                    pointerEvents: 'auto'
                 }}>
                     <LogCard
                         log={log}
@@ -305,122 +359,216 @@ export default function LogsViewer({
                 </div>
             );
 
-            // 2. If has referenced block and expanded, show referenced content (NESTED)
+            // 2. If has referenced block and expanded, show referenced content (NESTED - ONLY CASE FOR NESTING)
             if (hasReferencedBlock && !isCollapsed && referencedBlockData[log.id]) {
                 const referencedTree = buildTree(referencedBlockData[log.id]);
-                logElements.push(
+                result.push(
                     <div key={`${keyPrefix}-ref-${log.id}`} style={{
                         marginLeft: '30px',
                         marginTop: 'var(--space)',
                         paddingLeft: '15px',
                         borderLeft: '2px solid var(--primary)',
-                        opacity: 0.9,
-                        pointerEvents: 'auto'
+                        opacity: 0.95,
+                        pointerEvents: 'auto',
+                        background: 'rgba(37, 99, 235, 0.02)',
+                        borderRadius: '0 8px 8px 0',
+                        position: 'relative'
                     }}>
-                        {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp, log.id)}
+                        <div style={{
+                            position: 'absolute',
+                            top: '-1px',
+                            left: '-2px',
+                            background: 'var(--primary)',
+                            color: 'white',
+                            padding: '2px 8px',
+                            borderRadius: '0 4px 4px 0',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            letterSpacing: '0.5px'
+                        }}>
+                            🔗 {log.referencedBlock!.name}
+                        </div>
 
-                        {/* Load more button for this referenced block */}
+                        <div style={{ paddingTop: '20px' }}>
+                            {renderLogStructure(referencedTree, depth + 1, `${keyPrefix}-ref-${log.id}`, log.timestamp)}
+                        </div>
+
                         <LoadMoreButton
                             onClick={() => loadMoreReferencedLogs(log.id, log.referencedBlock!.id)}
                             loading={loadingMoreReferenced.has(log.id)}
-                            hasMore={!!referencedBlockCursors[log.id]}
+                            hasMore={hasMoreReferencedLogs[log.id] !== false}
                             label="Load More Referenced Logs"
+                            context="referenced"
+                            blockName={log.referencedBlock!.name}
+                            isNested={true}
                         />
                     </div>
                 );
             }
 
-            // 3. Handle original children (SEQUENTIAL/PARALLEL)
-            if (isParallel) {
-                logElements.push(
-                    <div key={`${keyPrefix}-par-${log.id}`} style={{
-                        marginTop: '16px',
-                        marginBottom: '16px',
-                        pointerEvents: 'auto'
+            // 3. Handle children - CRITICAL: Children continue at same level (no nesting)
+            if (hasChildren) {
+                if (log.children!.length === 1) {
+                    // Single child: Continue sequential flow at same level
+                    result.push(
+                        <div key={`connector-${log.id}`} style={{
+                            width: '2px',
+                            height: '8px',
+                            background: 'var(--border)',
+                            margin: '4px 0 4px 12px',
+                            borderRadius: '1px'
+                        }}/>
+                    );
+                    processLog(log.children![0], 0); // Process child at same level
+                } else {
+                    // Multiple children: Show as parallel operations
+                    result.push(
+                        <div key={`${keyPrefix}-par-${log.id}`} style={{
+                            marginTop: '16px',
+                            marginBottom: '16px',
+                            pointerEvents: 'auto'
+                        }}>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                marginBottom: '12px',
+                                color: 'var(--text-light)',
+                                fontSize: '12px',
+                                fontWeight: '500'
+                            }}>
+                                <div style={{
+                                    width: '20px',
+                                    height: '1px',
+                                    background: 'var(--border)',
+                                    marginRight: 'var(--space)'
+                                }}/>
+                                ⚡ Parallel Execution
+                                <div style={{
+                                    flex: 1,
+                                    height: '1px',
+                                    background: 'var(--border)',
+                                    marginLeft: 'var(--space)'
+                                }}/>
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: `repeat(${log.children!.length}, 1fr)`,
+                                gap: 'calc(var(--space) * 2)',
+                                minHeight: '100px'
+                            }}>
+                                {log.children!.map((parallelLog, idx) => (
+                                    <div key={parallelLog.id} style={{
+                                        padding: 'var(--space)',
+                                        background: 'var(--bg)',
+                                        border: '1px solid var(--border)',
+                                        borderRadius: '8px',
+                                        position: 'relative',
+                                        pointerEvents: 'auto'
+                                    }}>
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '-8px',
+                                            left: 'var(--space)',
+                                            background: '#f59e0b',
+                                            color: 'white',
+                                            padding: '2px 8px',
+                                            borderRadius: '4px',
+                                            fontSize: '10px',
+                                            fontWeight: '600'
+                                        }}>
+                                            PARALLEL {idx + 1}
+                                        </div>
+                                        <div style={{ marginTop: 'var(--space)' }}>
+                                            {renderLogStructure([parallelLog], depth, `${keyPrefix}-par-${log.id}-${idx}`, log.timestamp)}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+            }
+        };
+
+        // Handle root level logs - if multiple with same parent, show as siblings
+        if (logs.length > 1) {
+            // Multiple logs at same level = siblings (parallel operations)
+            result.push(
+                <div key={`${keyPrefix}-siblings`} style={{
+                    marginTop: '16px',
+                    marginBottom: '16px',
+                    pointerEvents: 'auto'
+                }}>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        marginBottom: '12px',
+                        color: 'var(--text-light)',
+                        fontSize: '12px',
+                        fontWeight: '500'
                     }}>
                         <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            marginBottom: '12px',
-                            color: 'var(--text-light)',
-                            fontSize: '12px',
-                            fontWeight: '500'
-                        }}>
-                            <div style={{
-                                width: '20px',
-                                height: '1px',
-                                background: 'var(--border)',
-                                marginRight: 'var(--space)'
-                            }}/>
-                            ⚡ Parallel Execution
-                            <div style={{
-                                flex: 1,
-                                height: '1px',
-                                background: 'var(--border)',
-                                marginLeft: 'var(--space)'
-                            }}/>
-                        </div>
+                            width: '20px',
+                            height: '1px',
+                            background: 'var(--border)',
+                            marginRight: 'var(--space)'
+                        }}/>
+                        👥 Sibling Operations ({logs.length})
                         <div style={{
-                            display: 'grid',
-                            gridTemplateColumns: `repeat(${log.children!.length}, 1fr)`,
-                            gap: 'calc(var(--space) * 2)',
-                            minHeight: '100px'
-                        }}>
-                            {log.children!.map((parallelLog, idx) => (
-                                <div key={parallelLog.id} style={{
-                                    padding: 'var(--space)',
-                                    background: 'var(--bg)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: '8px',
-                                    position: 'relative',
-                                    pointerEvents: 'auto'
-                                }}>
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '-8px',
-                                        left: 'var(--space)',
-                                        background: '#f59e0b',
-                                        color: 'white',
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '10px',
-                                        fontWeight: '600'
-                                    }}>
-                                        PARALLEL {idx + 1}
-                                    </div>
-                                    <div style={{ marginTop: 'var(--space)' }}>
-                                        {renderLogStructure([parallelLog], depth, `${keyPrefix}-par-${log.id}-${idx}`, log.timestamp)}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                            flex: 1,
+                            height: '1px',
+                            background: 'var(--border)',
+                            marginLeft: 'var(--space)'
+                        }}/>
                     </div>
-                );
-            } else if (isSequential) {
-                logElements.push(
-                    <div key={`connector-${log.id}`} style={{
-                        width: '2px',
-                        height: '8px',
-                        background: 'var(--border)',
-                        margin: '4px 0 4px 12px',
-                        borderRadius: '1px'
-                    }}/>
-                );
-                logElements.push(...renderLogStructure(log.children!, depth, keyPrefix, log.timestamp));
-            }
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: `repeat(${Math.min(logs.length, 3)}, 1fr)`,
+                        gap: 'calc(var(--space) * 2)',
+                        minHeight: '100px'
+                    }}>
+                        {logs.map((log, idx) => (
+                            <div key={log.id} style={{
+                                padding: 'var(--space)',
+                                background: 'var(--bg)',
+                                border: '1px solid var(--border)',
+                                borderRadius: '8px',
+                                position: 'relative',
+                                pointerEvents: 'auto'
+                            }}>
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '-8px',
+                                    left: 'var(--space)',
+                                    background: '#ec4899',
+                                    color: 'white',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '600'
+                                }}>
+                                    SIBLING {idx + 1}
+                                </div>
+                                <div style={{ marginTop: 'var(--space)' }}>
+                                    {renderLogStructure([log], depth, `${keyPrefix}-sibling-${idx}`, parentTimestamp)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        } else {
+            // Single log - process normally with its children
+            logs.forEach((log, index) => processLog(log, index));
+        }
 
-            return logElements;
-        });
-
-        return elements;
+        return result;
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // Only start dragging if clicking on the canvas background, not on interactive elements
         if (e.button !== 0) return;
         const target = e.target as HTMLElement;
 
-        // Don't start dragging if clicking on buttons, cards, or other interactive elements
         if (target.closest('button') || target.closest('.card') || target.closest('[data-interactive]')) {
             return;
         }
@@ -598,12 +746,14 @@ export default function LogsViewer({
                             : renderLogStructure(treeStructure)
                         }
 
-                        {/* Main block load more button */}
                         <LoadMoreButton
                             onClick={loadMoreLogs}
                             loading={loadingMore}
-                            hasMore={!!nextCursor}
+                            hasMore={hasMoreMainLogs}
                             label="Load More Main Logs"
+                            context="main"
+                            blockName={block.name}
+                            isNested={false}
                         />
                     </div>
                 </div>
@@ -627,6 +777,9 @@ export default function LogsViewer({
                 }}>
                     <div style={{ display: 'flex', gap: 'calc(var(--space) * 3)' }}>
                         <span>🔗 Referenced Block</span>
+                        <span>📋 Referenced Block Logs</span>
+                        <span>📥 Main Block Logs</span>
+                        <span>👥 Sibling Operations</span>
                         <span>⚡ Parallel Execution</span>
                         <span>⬇️ Sequential Flow</span>
                     </div>

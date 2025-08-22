@@ -41,10 +41,18 @@ const LogCard = memo(({ log, collapsed, loadingReferenced, onToggleExpand, onNav
                         <button
                             onClick={handleExpandClick}
                             style={{
-                                background: 'none', border: 'none', color: 'var(--primary)',
-                                fontSize: 12, cursor: 'pointer', padding: '4px', borderRadius: '4px',
-                                transform: !collapsed ? 'rotate(90deg)' : 'rotate(0deg)',
-                                transition: 'all 0.2s ease'
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--primary)',
+                                fontSize: 12,
+                                cursor: 'pointer',
+                                padding: '4px',
+                                borderRadius: '4px',
+                                // Fixed: collapsed shows right arrow, expanded shows down arrow
+                                transform: collapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                                transition: 'all 0.2s ease',
+                                // Visual feedback for loading
+                                opacity: loadingReferenced ? 0.5 : 1
                             }}
                         >
                             {loadingReferenced ? "⏳" : (collapsed ? "▶" : "▼")}
