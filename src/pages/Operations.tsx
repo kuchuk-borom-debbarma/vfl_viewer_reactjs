@@ -30,47 +30,76 @@ export const Operations: React.FC<OperationsProps> = ({ goBack }) => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
-            <div className="max-w-7xl mx-auto px-6 py-12">
-                <Button variant="outline" className="mb-6" onClick={goBack}>
-                    ← Back
-                </Button>
-
-                <h2 className="text-4xl font-bold text-center mb-12 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Active Operations
-                </h2>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 min-h-[300px]">
-                    {error ? (
-                        <div className="col-span-full text-center text-red-500 p-8 bg-red-50 rounded-xl border border-red-200">
-                            <div className="text-lg font-semibold mb-2">⚠️ Error Loading Operations</div>
-                            <div>{error}</div>
+        <div className="min-h-screen bg-gray-50">
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200">
+                <div className="max-w-6xl mx-auto px-6 py-4">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" onClick={goBack} className="text-gray-600">
+                            ← Back
+                        </Button>
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-800">Operations</h1>
+                            <div className="text-sm text-gray-500">
+                                {blocks.length > 0 ? `${blocks.length} operations found` : 'Loading operations...'}
+                            </div>
                         </div>
-                    ) : blocks.length === 0 && loading ? (
-                        <div className="col-span-full text-center text-gray-500 p-12">
-                            <div className="text-2xl mb-4">🔄</div>
-                            <div className="text-lg">Loading operations...</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Content */}
+            <div className="max-w-6xl mx-auto px-6 py-8">
+                {error ? (
+                    <div className="text-center py-20">
+                        <div className="bg-red-50 border border-red-200 rounded-xl p-8 max-w-md mx-auto">
+                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-lg flex items-center justify-center text-xl mx-auto mb-4">
+                                ⚠
+                            </div>
+                            <div className="text-lg font-semibold text-red-700 mb-2">Error Loading Operations</div>
+                            <div className="text-red-600 text-sm">{error}</div>
                         </div>
-                    ) : (
-                        blocks.map(block => (
-                            <BlockCard
-                                key={block.id}
-                                block={block}
-                                onClick={() => setSelectedBlock(block)}
+                    </div>
+                ) : blocks.length === 0 && loading ? (
+                    <div className="text-center py-20">
+                        <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-xl mx-auto mb-4 animate-pulse">
+                            🔄
+                        </div>
+                        <div className="text-lg font-medium text-gray-700 mb-2">Loading operations...</div>
+                        <div className="text-sm text-gray-500">Fetching execution blocks</div>
+                    </div>
+                ) : blocks.length === 0 ? (
+                    <div className="text-center py-20">
+                        <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-xl mx-auto mb-4">
+                            📋
+                        </div>
+                        <div className="text-lg font-medium text-gray-700 mb-2">No operations found</div>
+                        <div className="text-sm text-gray-500">No execution blocks are available yet</div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {blocks.map(block => (
+                                <BlockCard
+                                    key={block.id}
+                                    block={block}
+                                    onClick={() => setSelectedBlock(block)}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="text-center mt-12">
+                            <LoadingButton
+                                onClick={loadMore}
+                                loading={loading}
+                                hasMore={true}
+                                label="Load More Operations"
+                                variant="outline"
+                                size="md"
                             />
-                        ))
-                    )}
-                </div>
-
-                <div className="text-center mt-12">
-                    <LoadingButton
-                        onClick={loadMore}
-                        loading={loading}
-                        hasMore={true}
-                        label="Load More Operations"
-                        variant="outline"
-                    />
-                </div>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -86,60 +115,79 @@ const BlockCard: React.FC<{ block: Block; onClick: () => void }> = ({
         <Card
             interactive
             onClick={onClick}
-            className="hover:shadow-lg hover:border-blue-300 transition-all duration-300 group"
+            className="hover:shadow-md hover:border-gray-300 transition-all duration-200 h-full"
         >
+            {/* Header */}
             <div className="flex justify-between items-start mb-4">
-                <div className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
-                    {block.name}
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-800 truncate mb-1">
+                        {block.name}
+                    </h3>
+                    <div className="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded w-fit">
+                        {getTrimmedId(block.id)}
+                    </div>
                 </div>
-                <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                <div className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ml-3 ${
                     isOngoing
-                        ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                        : 'bg-green-100 text-green-800 border border-green-200'
+                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                        : 'bg-green-100 text-green-700 border border-green-200'
                 }`}>
-                    {isOngoing ? '🔄 Running' : '✅ Complete'}
+                    {isOngoing ? 'Running' : 'Complete'}
                 </div>
             </div>
 
+            {/* Details Grid */}
             <div className="space-y-3 text-sm">
-                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center">
-                    <span className="text-gray-500 font-medium">🆔 ID:</span>
-                    <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                        {getTrimmedId(block.id)}
+                <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Started</span>
+                    <span className="text-gray-800 text-xs">
+                        {new Date(block.startTime).toLocaleString()}
                     </span>
+                </div>
 
-                    <span className="text-gray-500 font-medium">🚀 Started:</span>
-                    <span className="text-gray-700">{new Date(block.startTime).toLocaleString()}</span>
-
-                    <span className="text-gray-500 font-medium">🏁 Ended:</span>
-                    <span className={isOngoing ? 'text-orange-600 font-semibold' : 'text-gray-700'}>
-                        {isOngoing ? "⏳ Ongoing" : new Date(block.endTime!).toLocaleString()}
-                    </span>
-
-                    <span className="text-gray-500 font-medium">⏱️ Duration:</span>
-                    <span className="text-blue-600 font-semibold">
+                <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Duration</span>
+                    <span className="text-gray-800 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                         {formatDuration(block.startTime, block.endTime)}
                     </span>
-
-                    <span className="text-gray-500 font-medium">📅 Created:</span>
-                    <span className="text-gray-700">{new Date(block.createdAt).toLocaleString()}</span>
                 </div>
 
-                {block.endMessage && (
-                    <div className="mt-4 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
-                        <div className="font-semibold mb-1 text-blue-700 text-xs">
-                            💬 End Message:
-                        </div>
-                        <div className="italic text-xs text-blue-800">"{block.endMessage}"</div>
+                {block.endTime && (
+                    <div className="flex justify-between items-center">
+                        <span className="text-gray-500 font-medium">Ended</span>
+                        <span className="text-gray-800 text-xs">
+                            {new Date(block.endTime).toLocaleString()}
+                        </span>
                     </div>
                 )}
+
+                <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Created</span>
+                    <span className="text-gray-800 text-xs">
+                        {new Date(block.createdAt).toLocaleString()}
+                    </span>
+                </div>
             </div>
 
-            <div className="mt-6 flex items-center justify-between">
+            {/* End Message */}
+            {block.endMessage && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-xs font-medium text-blue-700 mb-1">End Message</div>
+                    <div className="text-xs text-blue-800 leading-relaxed">
+                        {block.endMessage.length > 100
+                            ? `${block.endMessage.slice(0, 100)}...`
+                            : block.endMessage
+                        }
+                    </div>
+                </div>
+            )}
+
+            {/* Footer */}
+            <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-xs text-gray-500">
                     Click to explore execution flow
                 </div>
-                <div className="text-blue-500 group-hover:text-blue-700 transition-colors">
+                <div className="text-gray-400 group-hover:text-gray-600 transition-colors">
                     →
                 </div>
             </div>

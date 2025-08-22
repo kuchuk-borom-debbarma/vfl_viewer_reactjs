@@ -4,7 +4,7 @@ export const CONFIG = {
     DEFAULT_PAGE_SIZE: 5,
     MAX_ZOOM: 3,
     MIN_ZOOM: 0.1,
-    ZOOM_STEP: 0.2,
+    ZOOM_STEP: 0.001,
 } as const;
 
 export const ROUTES = {
