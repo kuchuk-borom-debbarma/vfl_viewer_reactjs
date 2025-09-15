@@ -1,6 +1,6 @@
-import { Block, LogsResponse } from "../types";
-import { CONFIG, ROUTES } from "../config/constants";
-import { getApiUrl } from "../utils";
+import {Block, LogEntry} from "../types";
+import {CONFIG, ROUTES} from "../config/constants";
+import {getApiUrl} from "../utils";
 
 const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data?: any) => {
     const timestamp = new Date().toISOString();
@@ -39,24 +39,63 @@ const apiFetch = async <T>(endpoint: string): Promise<T> => {
     }
 };
 
-export const getRootBlocks = (
+// Transform backend Block to frontend Block
+const transformBlock = (backendBlock: any): Block => ({
+    id: backendBlock.id,
+    name: backendBlock.name,
+    createdAt: backendBlock.createdAt,
+    enteredAt: backendBlock.enteredAt,
+    exitedAt: backendBlock.exitedAt,
+    returnedAt: backendBlock.returnedAt,
+    exitMessage: backendBlock.exitMessage,
+    cursor: backendBlock.cursor,
+    // Computed properties for compatibility
+    startTime: backendBlock.enteredAt || backendBlock.createdAt,
+    endTime: backendBlock.exitedAt,
+    endMessage: backendBlock.exitMessage
+});
+
+// Transform backend LogEntry to frontend LogEntry
+const transformLogEntry = (backendLog: any): LogEntry => ({
+    id: backendLog.id || backendLog.getId?.(),
+    blockId: backendLog.blockId || backendLog.getBlockId?.(),
+    parentLogId: backendLog.parentLogId || backendLog.getParentLogId()?.(),
+    message: backendLog.message || backendLog.getMessage?.(),
+    referencedBlock: backendLog.referencedBlock || backendLog.getReferencedBlock?.()
+        ? transformBlock(backendLog.referencedBlock || backendLog.getReferencedBlock())
+        : null,
+    timestamp: backendLog.timestamp || backendLog.getTimestamp?.(),
+    logType: backendLog.logType || backendLog.getLogType?.(),
+    cursor: backendLog.cursor || backendLog.getCursor?.(),
+});
+
+export const getRootBlocks = async (
     limit = CONFIG.DEFAULT_PAGE_SIZE,
     cursor?: string
 ): Promise<Block[]> => {
-    const params = new URLSearchParams({ limit: limit.toString() });
+    const params = new URLSearchParams({limit: limit.toString()});
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<Block[]>(`${ROUTES.ROOT_BLOCKS}?${params}`);
+
+    const data = await apiFetch<any[]>(`${ROUTES.BLOCKS}?${params}`);
+    return data.map(transformBlock);
 };
 
-export const getLogsByBlockId = (
+export const getLogsByBlockId = async (
     blockId: string,
     limit = CONFIG.DEFAULT_PAGE_SIZE,
     cursor?: string
-): Promise<LogsResponse> => {
-    const params = new URLSearchParams({
-        blockId,
-        limit: limit.toString(),
-    });
+): Promise<{ logs: LogEntry[], nextCursor: string | null }> => {
+    const params = new URLSearchParams({limit: limit.toString()});
     if (cursor) params.append("cursor", cursor);
-    return apiFetch<LogsResponse>(`${ROUTES.LOGS_BY_BLOCK}?${params}`);
+
+    const data = await apiFetch<any[]>(`${ROUTES.LOGS}/${blockId}?${params}`);
+    const logs = data.map(transformLogEntry);
+
+    // Determine next cursor and hasMore
+    const nextCursor = logs.length > 0 ? logs[logs.length - 1].cursor : null;
+
+    return {
+        logs,
+        nextCursor: logs.length >= limit ? nextCursor : null
+    };
 };

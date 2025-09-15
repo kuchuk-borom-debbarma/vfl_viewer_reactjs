@@ -1,3 +1,4 @@
+
 import {useState, useEffect, useCallback} from 'react';
 import {LogEntry, Block} from '../types';
 import {getLogsByBlockId} from '../api/vfl';
@@ -33,36 +34,39 @@ export const useLogs = (blockId: string) => {
             );
 
             if (isInitial) {
-                // Create a dummy block object from blockId since we don't have block endpoint
+                // Create a dummy block object since we only have logs endpoint
+                // In a real implementation, you might want to add a block details endpoint
                 setBlock({
                     id: blockId,
                     name: `Block ${blockId.slice(-8)}`,
                     createdAt: Date.now(),
+                    enteredAt: Date.now(),
+                    exitedAt: null,
+                    returnedAt: null,
+                    exitMessage: null,
+                    cursor: blockId,
                     startTime: Date.now(),
                     endTime: null,
-                    endMessage: null,
-                    cursor: blockId
+                    endMessage: null
                 });
 
-                // FIXED: Initialize collapsed state BEFORE setting logs
+                // Initialize collapsed state for referenced blocks
                 const referencedBlocks = new Set<string>();
                 response.logs.forEach(log => {
                     if (log.referencedBlock) referencedBlocks.add(log.id);
                 });
 
-                // Set both logs and collapsed state in the same update cycle
                 setAllLogs(response.logs);
                 setCollapsed(referencedBlocks);
                 setReferencedBlockData({});
                 setReferencedCursors({});
                 setHasMoreReferenced({});
             } else {
-                // For append, just add logs
                 setAllLogs(prev => [...prev, ...response.logs]);
             }
 
             setNextCursor(response.nextCursor);
-            setHasMore(response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor);
+            setHasMore(!!response.nextCursor);
 
         } catch (err: any) {
             setError(err.message);
@@ -84,7 +88,6 @@ export const useLogs = (blockId: string) => {
         try {
             const response = await getLogsByBlockId(log.referencedBlock.id);
 
-            // FIXED: Find any referenced blocks in the newly loaded logs
             const newReferencedBlocks = new Set<string>();
             response.logs.forEach(nestedLog => {
                 if (nestedLog.referencedBlock) {
@@ -96,14 +99,12 @@ export const useLogs = (blockId: string) => {
             setReferencedCursors(prev => ({...prev, [log.id]: response.nextCursor}));
             setHasMoreReferenced(prev => ({
                 ...prev,
-                [log.id]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
+                [log.id]: !!response.nextCursor
             }));
 
             setCollapsed(prev => {
                 const newSet = new Set(prev);
-                // Remove the current log (it's now expanded)
                 newSet.delete(log.id);
-                // Add all new referenced blocks as collapsed
                 newReferencedBlocks.forEach(id => newSet.add(id));
                 return newSet;
             });
@@ -140,7 +141,7 @@ export const useLogs = (blockId: string) => {
 
             setHasMoreReferenced(prev => ({
                 ...prev,
-                [logId]: response.logs.length >= CONFIG.DEFAULT_PAGE_SIZE && !!response.nextCursor
+                [logId]: !!response.nextCursor
             }));
         } catch (err: any) {
             setError(`Failed to load more referenced logs: ${err.message}`);

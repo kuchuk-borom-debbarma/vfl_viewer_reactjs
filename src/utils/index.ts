@@ -1,5 +1,5 @@
 import { CONFIG, LOG_SYMBOLS, LOG_COLORS } from '../config/constants';
-import { LogEntry } from '../types';
+import { LogEntry, LogType } from '../types';
 
 // API utilities
 export const getApiUrl = (endpoint: string) =>
@@ -39,31 +39,24 @@ export const calculateDuration = (
     return `+${[h && `${h}h`, m && `${m}m`, `${s}s`].filter(Boolean).join(" ")}`;
 };
 
-// Log utilities
-export const getLogSymbol = (logType: string): string =>
-    LOG_SYMBOLS[logType as keyof typeof LOG_SYMBOLS] || "🔥";
+// Log utilities - Updated for new LogType enum
+export const getLogSymbol = (logType: LogType): string =>
+    LOG_SYMBOLS[logType] || "📝";
 
-export const getLogTypeColor = (logType: string): string => {
-    const colorMap: Record<string, string> = {
-        'SUB_BLOCK_START_PRIMARY': LOG_COLORS.primary,
-        'SUB_BLOCK_START_SECONDARY_NO_JOIN': LOG_COLORS.secondary,
-        'PUBLISH_EVENT': LOG_COLORS.warning,
-        'MESSAGE': LOG_COLORS.info,
-        'WARN': LOG_COLORS.warning,
-        'ERROR': LOG_COLORS.error,
+export const getLogTypeColor = (logType: LogType): string =>
+    LOG_COLORS[logType] || LOG_COLORS.INFO;
+
+export const getLogTypeBadge = (logType: LogType) => {
+    const badges: Record<LogType, { text: string; color: string }> = {
+        [LogType.INFO]: { text: 'Info', color: LOG_COLORS.INFO },
+        [LogType.WARN]: { text: 'Warning', color: LOG_COLORS.WARN },
+        [LogType.ERROR]: { text: 'Error', color: LOG_COLORS.ERROR },
+        [LogType.TRACE_PRIMARY]: { text: 'Start', color: LOG_COLORS.TRACE_PRIMARY },
+        [LogType.TRACE_PARALLEL_JOIN]: { text: 'Join', color: LOG_COLORS.TRACE_PARALLEL_JOIN },
+        [LogType.TRACE_PARALLEL]: { text: 'Parallel', color: LOG_COLORS.TRACE_PARALLEL },
+        [LogType.TRACE_REMOTE]: { text: 'Remote', color: LOG_COLORS.TRACE_REMOTE },
+        [LogType.PUBLISH_EVENT]: { text: 'Publish', color: LOG_COLORS.PUBLISH_EVENT },
+        [LogType.LISTEN_EVENT]: { text: 'Listen', color: LOG_COLORS.LISTEN_EVENT }
     };
-    return colorMap[logType] || LOG_COLORS.info;
+    return badges[logType] || { text: 'Unknown', color: LOG_COLORS.INFO };
 };
-
-export const getLogTypeBadge = (logType: string) => {
-    const badges: Record<string, { text: string; color: string }> = {
-        'SUB_BLOCK_START_PRIMARY': { text: 'Start', color: LOG_COLORS.primary },
-        'PUBLISH_EVENT': { text: 'Event', color: LOG_COLORS.warning },
-        'MESSAGE': { text: 'Info', color: LOG_COLORS.info },
-        'WARN': { text: 'Warning', color: LOG_COLORS.warning },
-        'ERROR': { text: 'Error', color: LOG_COLORS.error },
-    };
-    return badges[logType] || { text: 'Unknown', color: LOG_COLORS.info };
-};
-
-// REMOVED: buildLogTree function - we now handle this directly in LogTree component

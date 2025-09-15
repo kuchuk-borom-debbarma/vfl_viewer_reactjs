@@ -36,53 +36,11 @@ const MinimalLogCard = memo<{
 
     const getLogTypeTheme = (logType: string) => {
         const themes = {
-            'SUB_BLOCK_START_PRIMARY': {
-                bg: 'bg-slate-50',
-                border: 'border-slate-200 hover:border-slate-300',
-                accent: 'text-slate-700',
-                icon: '▶'
-            },
-            'SUB_BLOCK_START_SECONDARY_NO_JOIN': {
-                bg: 'bg-blue-50',
-                border: 'border-blue-200 hover:border-blue-300',
-                accent: 'text-blue-700',
-                icon: '↗'
-            },
-            'SUB_BLOCK_START_SECONDARY_JOIN': {
-                bg: 'bg-purple-50',
-                border: 'border-purple-200 hover:border-purple-300',
-                accent: 'text-purple-700',
-                icon: '⤴'
-            },
-            'PUBLISH_EVENT': {
-                bg: 'bg-amber-50',
-                border: 'border-amber-200 hover:border-amber-300',
-                accent: 'text-amber-700',
-                icon: '→'
-            },
-            'SUB_BLOCK_CONTINUE': {
-                bg: 'bg-indigo-50',
-                border: 'border-indigo-200 hover:border-indigo-300',
-                accent: 'text-indigo-700',
-                icon: '↓'
-            },
-            'SUB_BLOCK_CONTINUE_COMPLETE': {
-                bg: 'bg-emerald-50',
-                border: 'border-emerald-200 hover:border-emerald-300',
-                accent: 'text-emerald-700',
-                icon: '✓'
-            },
-            'EVENT_LISTENER': {
-                bg: 'bg-rose-50',
-                border: 'border-rose-200 hover:border-rose-300',
-                accent: 'text-rose-700',
-                icon: '◉'
-            },
-            'MESSAGE': {
+            'INFO': {
                 bg: 'bg-gray-50',
                 border: 'border-gray-200 hover:border-gray-300',
                 accent: 'text-gray-700',
-                icon: '·'
+                icon: 'ℹ'
             },
             'WARN': {
                 bg: 'bg-orange-50',
@@ -95,9 +53,45 @@ const MinimalLogCard = memo<{
                 border: 'border-red-200 hover:border-red-300',
                 accent: 'text-red-700',
                 icon: '✕'
+            },
+            'TRACE_PRIMARY': {
+                bg: 'bg-slate-50',
+                border: 'border-slate-200 hover:border-slate-300',
+                accent: 'text-slate-700',
+                icon: '▶'
+            },
+            'TRACE_PARALLEL_JOIN': {
+                bg: 'bg-purple-50',
+                border: 'border-purple-200 hover:border-purple-300',
+                accent: 'text-purple-700',
+                icon: '↤'
+            },
+            'TRACE_PARALLEL': {
+                bg: 'bg-blue-50',
+                border: 'border-blue-200 hover:border-blue-300',
+                accent: 'text-blue-700',
+                icon: '↗'
+            },
+            'TRACE_REMOTE': {
+                bg: 'bg-indigo-50',
+                border: 'border-indigo-200 hover:border-indigo-300',
+                accent: 'text-indigo-700',
+                icon: '🌐'
+            },
+            'PUBLISH_EVENT': {
+                bg: 'bg-amber-50',
+                border: 'border-amber-200 hover:border-amber-300',
+                accent: 'text-amber-700',
+                icon: '📢'
+            },
+            'LISTEN_EVENT': {
+                bg: 'bg-rose-50',
+                border: 'border-rose-200 hover:border-rose-300',
+                accent: 'text-rose-700',
+                icon: '🎧'
             }
         };
-        return themes[logType] || themes['MESSAGE'];
+        return themes[logType] || themes['INFO'];
     };
 
     const theme = getLogTypeTheme(log.logType);
@@ -178,6 +172,15 @@ const MinimalLogCard = memo<{
                                 <span className="text-gray-400">Block:</span>
                                 <span className="ml-2 font-mono">{getTrimmedId(log.blockId)}</span>
                             </div>
+                            {log.parentLogId && (
+                                <>
+                                    <div>
+                                        <span className="text-gray-400">Parent:</span>
+                                        <span className="ml-2 font-mono">{getTrimmedId(log.parentLogId)}</span>
+                                    </div>
+                                    <div></div>
+                                </>
+                            )}
                         </div>
                         {log.message && log.message.length > 100 && (
                             <div className="mt-3 p-3 bg-gray-50 rounded text-xs text-gray-600">
@@ -227,7 +230,7 @@ const MinimalReferencedBlockCard: React.FC<{
 
 MinimalLogCard.displayName = 'MinimalLogCard';
 
-// FIXED: Properly implementing side-by-side siblings
+// Updated to properly use parentLogId from backend
 export const LogTree: React.FC<LogTreeProps> = ({
                                                     logs,
                                                     depth = 0,
@@ -244,14 +247,15 @@ export const LogTree: React.FC<LogTreeProps> = ({
                                                 }) => {
     if (!logs || logs.length === 0) return null;
 
-    // Build child map following the flat-list algorithm
+    // Build child map using the parentLogId provided by backend
     const childMap = new Map<string | null, LogEntry[]>();
 
     logs.forEach(log => {
-        if (!childMap.has(log.parentLogId)) {
-            childMap.set(log.parentLogId, []);
+        const parentId = log.parentLogId || null; // Use null for root-level logs
+        if (!childMap.has(parentId)) {
+            childMap.set(parentId, []);
         }
-        childMap.get(log.parentLogId)!.push(log);
+        childMap.get(parentId)!.push(log);
     });
 
     // Render a single log with its referenced content and sequential children
@@ -330,7 +334,7 @@ export const LogTree: React.FC<LogTreeProps> = ({
 
         if (siblings.length === 0) return [];
 
-        // FIXED: Handle multiple siblings - render them side by side
+        // Handle multiple siblings - render them side by side
         if (siblings.length > 1) {
             return [
                 <div key={`${containerKey}-parallel-wrapper`} className="mb-6">
@@ -342,7 +346,7 @@ export const LogTree: React.FC<LogTreeProps> = ({
                         <div className="flex-1 h-px bg-gray-200"></div>
                     </div>
 
-                    {/* FIXED: Use horizontal flex layout for true side-by-side rendering */}
+                    {/* Use horizontal flex layout for true side-by-side rendering */}
                     <div className="flex gap-6 overflow-x-auto pb-4">
                         {siblings.map((siblingLog, idx) => (
                             <div
