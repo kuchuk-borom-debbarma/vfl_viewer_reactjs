@@ -1,4 +1,3 @@
-
 export const CONFIG = {
     API_HOST: "http://localhost:8080",
     API_VERSION: "v1",
@@ -9,8 +8,9 @@ export const CONFIG = {
 } as const;
 
 export const ROUTES = {
-    BLOCKS: "/blocks", // Updated to match backend
-    LOGS: "/logs", // Updated to match backend
+    BLOCKS: "/blocks",
+    LOGS: "/logs",
+    BLOCK: "/block", // New endpoint for individual block details
 } as const;
 
 export const LOG_SYMBOLS = {

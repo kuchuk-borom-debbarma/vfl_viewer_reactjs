@@ -39,7 +39,7 @@ const apiFetch = async <T>(endpoint: string): Promise<T> => {
     }
 };
 
-// Transform backend Block to frontend Block
+// Transform backend Block (ToFetchBlock) to frontend Block
 const transformBlock = (backendBlock: any): Block => ({
     id: backendBlock.id,
     name: backendBlock.name,
@@ -55,19 +55,22 @@ const transformBlock = (backendBlock: any): Block => ({
     endMessage: backendBlock.exitMessage
 });
 
-// Transform backend LogEntry to frontend LogEntry
-const transformLogEntry = (backendLog: any): LogEntry => ({
-    id: backendLog.id || backendLog.getId?.(),
-    blockId: backendLog.blockId || backendLog.getBlockId?.(),
-    parentLogId: backendLog.parentLogId || backendLog.getParentLogId()?.(),
-    message: backendLog.message || backendLog.getMessage?.(),
-    referencedBlock: backendLog.referencedBlock || backendLog.getReferencedBlock?.()
-        ? transformBlock(backendLog.referencedBlock || backendLog.getReferencedBlock())
-        : null,
-    timestamp: backendLog.timestamp || backendLog.getTimestamp?.(),
-    logType: backendLog.logType || backendLog.getLogType?.(),
-    cursor: backendLog.cursor || backendLog.getCursor?.(),
-});
+const transformLogEntry = (backendLog: any): LogEntry => {
+    console.log('Transforming log entry:', backendLog);
+
+    return {
+        id: backendLog.id,
+        blockId: backendLog.blockId,
+        parentLogId: backendLog.parentLogId === null ? null : backendLog.parentLogId,
+        message: backendLog.message,
+        referencedBlock: backendLog.referencedBlock
+            ? transformBlock(backendLog.referencedBlock)
+            : null,
+        timestamp: backendLog.timestamp,
+        logType: backendLog.logType,
+        cursor: backendLog.cursor,
+    };
+};
 
 export const getRootBlocks = async (
     limit = CONFIG.DEFAULT_PAGE_SIZE,
@@ -78,6 +81,11 @@ export const getRootBlocks = async (
 
     const data = await apiFetch<any[]>(`${ROUTES.BLOCKS}?${params}`);
     return data.map(transformBlock);
+};
+
+export const getBlockById = async (blockId: string): Promise<Block> => {
+    const data = await apiFetch<any>(`/block/${blockId}`);
+    return transformBlock(data);
 };
 
 export const getLogsByBlockId = async (
@@ -91,7 +99,7 @@ export const getLogsByBlockId = async (
     const data = await apiFetch<any[]>(`${ROUTES.LOGS}/${blockId}?${params}`);
     const logs = data.map(transformLogEntry);
 
-    // Determine next cursor and hasMore
+    // Determine next cursor based on response length
     const nextCursor = logs.length > 0 ? logs[logs.length - 1].cursor : null;
 
     return {

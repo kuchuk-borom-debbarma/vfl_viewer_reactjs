@@ -1,7 +1,6 @@
-
 import {useState, useEffect, useCallback} from 'react';
 import {LogEntry, Block} from '../types';
-import {getLogsByBlockId} from '../api/vfl';
+import {getLogsByBlockId, getBlockById} from '../api/vfl';
 import {CONFIG} from '../config/constants';
 
 export const useLogs = (blockId: string) => {
@@ -27,6 +26,32 @@ export const useLogs = (blockId: string) => {
         setError(null);
 
         try {
+            // Use the new endpoint to get block details
+            let blockData: Block | null = null;
+            if (isInitial) {
+                try {
+                    blockData = await getBlockById(blockId);
+                    setBlock(blockData);
+                } catch (blockError: any) {
+                    console.warn('Failed to load block details:', blockError.message);
+                    // Create a fallback block object if the specific block endpoint fails
+                    blockData = {
+                        id: blockId,
+                        name: `Block ${blockId.slice(-8)}`,
+                        createdAt: Date.now(),
+                        enteredAt: Date.now(),
+                        exitedAt: null,
+                        returnedAt: null,
+                        exitMessage: null,
+                        cursor: blockId,
+                        startTime: Date.now(),
+                        endTime: null,
+                        endMessage: null
+                    };
+                    setBlock(blockData);
+                }
+            }
+
             const response = await getLogsByBlockId(
                 blockId,
                 CONFIG.DEFAULT_PAGE_SIZE,
@@ -34,22 +59,6 @@ export const useLogs = (blockId: string) => {
             );
 
             if (isInitial) {
-                // Create a dummy block object since we only have logs endpoint
-                // In a real implementation, you might want to add a block details endpoint
-                setBlock({
-                    id: blockId,
-                    name: `Block ${blockId.slice(-8)}`,
-                    createdAt: Date.now(),
-                    enteredAt: Date.now(),
-                    exitedAt: null,
-                    returnedAt: null,
-                    exitMessage: null,
-                    cursor: blockId,
-                    startTime: Date.now(),
-                    endTime: null,
-                    endMessage: null
-                });
-
                 // Initialize collapsed state for referenced blocks
                 const referencedBlocks = new Set<string>();
                 response.logs.forEach(log => {
