@@ -5,6 +5,8 @@ export const CONFIG = {
     MAX_ZOOM: 3,
     MIN_ZOOM: 0.1,
     ZOOM_STEP: 0.001,
+    // Development mode detection
+    IS_DEV: import.meta.env?.DEV || process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost'
 } as const;
 
 export const ROUTES = {

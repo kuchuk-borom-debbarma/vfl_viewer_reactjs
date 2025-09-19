@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Flow Logger - Hierarchical Logging Framework</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: #374151;
+            background: #fafafa;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+            color: white;
+            padding: 4rem 0;
+            text-align: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto 2rem;
+        }
+
+        /* Sections */
+        section { padding: 3rem 0; }
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #1f2937;
+        }
+
+        /* Comparison Grid */
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .comparison-card {
+            background: white;
+            border-radius: 1rem;
+            border: 2px solid #e5e7eb;
+            padding: 2rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .comparison-card.traditional { border-color: #fca5a5; }
+        .comparison-card.vfl { border-color: #86efac; }
+
+        .comparison-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .comparison-icon {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .traditional .comparison-icon { background: #fee2e2; color: #dc2626; }
+        .vfl .comparison-icon { background: #dcfce7; color: #16a34a; }
+
+        /* Log Examples */
+        .log-example {
+            background: #f9fafb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85rem;
+        }
+
+        .log-line {
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem 0;
+            border-radius: 0.25rem;
+            border-left: 3px solid #d1d5db;
+        }
+
+        .log-line.info { border-left-color: #3b82f6; background: rgba(59, 130, 246, 0.05); }
+        .log-line.warn { border-left-color: #f59e0b; background: rgba(245, 158, 11, 0.05); }
+        .log-line.error { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); }
+        .log-line.success { border-left-color: #10b981; background: rgba(16, 185, 129, 0.05); }
+
+        /* VFL Hierarchical Example */
+        .vfl-log {
+            background: #f8fafc;
+            border-radius: 0.75rem;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            margin: 0.5rem 0;
+        }
+
+        .vfl-log-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .vfl-icon {
+            width: 1.5rem;
+            height: 1.5rem;
+            background: white;
+            border-radius: 0.25rem;
+            border: 1px solid #d1d5db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .vfl-badge {
+            background: #3b82f6;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .vfl-badge.auth { background: #10b981; }
+        .vfl-badge.remote { background: #06b6d4; }
+        .vfl-badge.event { background: #f59e0b; }
+
+        .vfl-message { flex: 1; font-weight: 500; color: #374151; }
+        .vfl-time { font-size: 0.75rem; color: #6b7280; }
+
+        .vfl-nested {
+            margin-left: 2rem;
+            border-left: 2px solid #e5e7eb;
+            padding-left: 1rem;
+        }
+
+        .vfl-parallel {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .vfl-parallel-branch {
+            flex: 1;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+        }
+
+        .vfl-parallel-header {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.1);
+        }
+
+        .feature-icon {
+            width: 3rem;
+            height: 3rem;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            margin-bottom: 1rem;
+            font-size: 1.25rem;
+            color: #1f2937;
+        }
+
+        .feature-card p {
+            margin-bottom: 1rem;
+            color: #6b7280;
+            line-height: 1.6;
+        }
+
+        .feature-details {
+            background: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border-left: 3px solid #3b82f6;
+        }
+
+        .feature-details ul {
+            margin-left: 1rem;
+            color: #4b5563;
+        }
+
+        .feature-details li {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Code Examples */
+        .code-section {
+            background: #f8fafc;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .code-example {
+            background: #1e293b;
+            color: #e2e8f0;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+        }
+
+        .code-comment { color: #94a3b8; }
+        .code-annotation { color: #fbbf24; }
+        .code-string { color: #34d399; }
+
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            background: white;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+
+        .comparison-table th {
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+            font-weight: 600;
+            background: #f8fafc;
+        }
+
+        .comparison-table td {
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .comparison-table .vfl-col {
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+        }
+
+        .status-no { color: #ef4444; }
+        .status-partial { color: #f59e0b; }
+        .status-yes { color: #10b981; font-weight: 600; }
+
+        /* Info Box */
+        .info-box {
+            background: #f0fdf4;
+            border: 1px solid #16a34a;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-box h4 {
+            color: #15803d;
+            margin-bottom: 1rem;
+        }
+
+        .info-box ul {
+            margin-left: 1.5rem;
+            line-height: 1.7;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .comparison, .vfl-parallel { grid-template-columns: 1fr; flex-direction: column; }
+            .hero h1 { font-size: 2.5rem; }
+            .container { padding: 0 1rem; }
+            .feature-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="hero">
+    <div class="container">
+        <h1>Visual Flow Logger</h1>
+        <p>A hierarchical logging framework built to simplify debugging complex operational projects. VFL transforms chaotic flat logs into structured, visual execution flows that make understanding large distributed systems effortless for development teams.</p>
+    </div>
+</div>
+
+<section>
+    <div class="container">
+        <h2 class="section-title">What is Visual Flow Logger?</h2>
+        <p style="text-align: center; font-size: 1.1rem; max-width: 900px; margin: 0 auto 3rem;">
+            VFL addresses the pain points developers face when working on large operational projects with complex distributed architectures.
+            Instead of drowning in flat log files, VFL presents your application's execution in structured hierarchical blocks that mirror
+            your actual code flow, making debugging intuitive and efficient for teams managing enterprise-scale systems.
+        </p>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🗂️</div>
+                <h3>Hierarchical Structure</h3>
+                <p>Transform flat logging chaos into organized execution trees that reflect your actual application flow and business logic.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>Nested blocks mirror your method call hierarchy</li>
+                        <li>Visual parent-child relationships show execution context</li>
+                        <li>Collapsible UI elements for focusing on specific operations</li>
+                        <li>Automatic depth tracking prevents infinite recursion issues</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>Distributed Tracing</h3>
+                <p>Seamlessly track operations across multiple services without the complexity of traditional distributed tracing solutions.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>Cross-service flow continuation with RemoteBlockWrapper</li>
+                        <li>Correlation IDs automatically managed across service boundaries</li>
+                        <li>Service topology visualization from actual execution data</li>
+                        <li>Network latency analysis with 4-timestamp precision</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Zero-Overhead Performance</h3>
+                <p>Built for production environments with ByteBuddy instrumentation and intelligent buffering strategies.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>Bytecode instrumentation eliminates runtime reflection overhead</li>
+                        <li>Asynchronous buffering with configurable flush intervals</li>
+                        <li>Thread-local storage prevents cross-thread contamination</li>
+                        <li>Minimal memory footprint with automatic buffer cleanup</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🔗</div>
+                <h3>Event-Driven Architecture</h3>
+                <p>First-class support for modern async patterns, pub/sub systems, and event-driven microservices.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>EventListenerBlock annotation for message handlers</li>
+                        <li>Publishing context propagation across event boundaries</li>
+                        <li>Parallel execution visualization for concurrent operations</li>
+                        <li>Integration with popular message brokers and event streams</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🎯</div>
+                <h3>Developer Experience</h3>
+                <p>Minimal setup with annotation-based API that doesn't require architectural changes to existing codebases.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>Single-line annotation setup for most use cases</li>
+                        <li>No framework lock-in or invasive dependency injection</li>
+                        <li>Hot-reload friendly development workflow</li>
+                        <li>IDE integration with rich debugging information</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Interactive Visualization</h3>
+                <p>Built-in web interface with advanced filtering, search, and analysis capabilities for operational teams.</p>
+                <div class="feature-details">
+                    <ul>
+                        <li>Real-time execution flow visualization with zoom/pan</li>
+                        <li>Advanced filtering by service, time range, or custom criteria</li>
+                        <li>Export capabilities for sharing debugging sessions</li>
+                        <li>Performance bottleneck identification with timing heatmaps</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section style="background: white;">
+    <div class="container">
+        <h2 class="section-title">Traditional vs VFL Logging</h2>
+
+        <div class="comparison">
+            <div class="comparison-card traditional">
+                <div class="comparison-header">
+                    <div class="comparison-icon">❌</div>
+                    <h3>Traditional Flat Logging</h3>
+                </div>
+
+                <div class="log-example">
+                    <div class="log-line info">[INFO] 14:23:10 Processing order ORD-2025-8847</div>
+                    <div class="log-line info">[INFO] 14:23:11 Authenticating customer</div>
+                    <div class="log-line info">[INFO] 14:23:11 Validating email credentials</div>
+                    <div class="log-line warn">[INFO] 14:23:12 Processing payment</div>
+                    <div class="log-line info">[INFO] 14:23:13 Warehouse picking process</div>
+                    <div class="log-line error">[ERROR] 14:23:15 Email service timeout</div>
+                    <div class="log-line success">[INFO] 14:23:16 Order completed</div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4>Questions remain:</h4>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: #6b7280;">
+                        <li>Which operations ran in parallel?</li>
+                        <li>What's the execution hierarchy?</li>
+                        <li>How do distributed services relate?</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="comparison-card vfl">
+                <div class="comparison-header">
+                    <div class="comparison-icon">✅</div>
+                    <h3>VFL Hierarchical Logging</h3>
+                </div>
+
+                <div class="vfl-log">
+                    <div class="vfl-log-header">
+                        <div class="vfl-icon">🛒</div>
+                        <div class="vfl-badge">Start</div>
+                        <div class="vfl-message">New order: ORD-2025-8847</div>
+                        <div class="vfl-time">14:23:10</div>
+                    </div>
+
+                    <div class="vfl-nested">
+                        <div class="vfl-log">
+                            <div class="vfl-log-header">
+                                <div class="vfl-icon">🔐</div>
+                                <div class="vfl-badge auth">Auth</div>
+                                <div class="vfl-message">Customer authentication</div>
+                                <div class="vfl-time">+150ms</div>
+                            </div>
+                        </div>
+
+                        <div style="text-align: center; margin: 1rem 0; font-size: 0.75rem; color: #8b5cf6; font-weight: 600;">
+                            2 parallel operations
+                        </div>
+
+                        <div class="vfl-parallel">
+                            <div class="vfl-parallel-branch">
+                                <div class="vfl-parallel-header">Branch 1</div>
+                                <div class="vfl-log">
+                                    <div class="vfl-log-header">
+                                        <div class="vfl-icon">🏭</div>
+                                        <div class="vfl-badge remote">Remote</div>
+                                        <div class="vfl-message">Warehouse service</div>
+                                        <div class="vfl-time">+320ms</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="vfl-parallel-branch">
+                                <div class="vfl-parallel-header">Branch 2</div>
+                                <div class="vfl-log">
+                                    <div class="vfl-log-header">
+                                        <div class="vfl-icon">💳</div>
+                                        <div class="vfl-badge event">Payment</div>
+                                        <div class="vfl-message">Process payment</div>
+                                        <div class="vfl-time">+280ms</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="vfl-log">
+                            <div class="vfl-log-header">
+                                <div class="vfl-icon">✅</div>
+                                <div class="vfl-badge">Complete</div>
+                                <div class="vfl-message">Order completed</div>
+                                <div class="vfl-time">+5.2s</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4>Clear insights:</h4>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem; color: #6b7280;">
+                        <li>Visual execution hierarchy & nesting</li>
+                        <li>Parallel vs sequential operations</li>
+                        <li>Cross-service flow tracing</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section>
+    <div class="container">
+        <h2 class="section-title">Comparison with Existing Solutions</h2>
+        <div style="overflow-x: auto;">
+            <table class="comparison-table">
+                <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Traditional Logging</th>
+                    <th>OpenTelemetry</th>
+                    <th>Jaeger/Zipkin</th>
+                    <th class="vfl-col">VFL</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td><strong>Hierarchical Structure</strong></td>
+                    <td class="status-no">No</td>
+                    <td class="status-partial">Spans Only</td>
+                    <td class="status-partial">Spans Only</td>
+                    <td class="status-yes">Native Blocks</td>
+                </tr>
+                <tr>
+                    <td><strong>Setup Complexity</strong></td>
+                    <td class="status-yes">Simple</td>
+                    <td class="status-no">Complex</td>
+                    <td class="status-no">Complex</td>
+                    <td class="status-yes">Annotations Only</td>
+                </tr>
+                <tr>
+                    <td><strong>Performance Impact</strong></td>
+                    <td class="status-yes">Low</td>
+                    <td class="status-partial">Medium</td>
+                    <td class="status-partial">Medium</td>
+                    <td class="status-yes">Minimal</td>
+                </tr>
+                <tr>
+                    <td><strong>Visual Flow</strong></td>
+                    <td class="status-no">No</td>
+                    <td class="status-partial">Timeline Only</td>
+                    <td class="status-partial">Timeline Only</td>
+                    <td class="status-yes">Interactive Trees</td>
+                </tr>
+                <tr>
+                    <td><strong>Event-Driven Support</strong></td>
+                    <td class="status-no">Manual</td>
+                    <td class="status-partial">Complex</td>
+                    <td class="status-partial">Complex</td>
+                    <td class="status-yes">Native</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="info-box">
+            <h4>VFL's Sweet Spot</h4>
+            <p style="margin-bottom: 1rem;">VFL occupies a unique niche in the observability landscape:</p>
+            <ul>
+                <li><strong>Simpler than OpenTelemetry:</strong> No complex instrumentation setup</li>
+                <li><strong>More insightful than traditional logging:</strong> Hierarchical structure shows actual execution relationships</li>
+                <li><strong>Better for development:</strong> Visual flow representation makes debugging intuitive</li>
+                <li><strong>Event-native:</strong> First-class support for modern async and event-driven architectures</li>
+            </ul>
+        </div>
+    </div>
+</section>
+</body>
+</html>

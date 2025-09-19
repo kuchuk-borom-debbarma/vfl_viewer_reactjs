@@ -1,15 +1,17 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Block } from "../types";
 import { useBlocks } from "../hooks/useBlocks";
 import { Button } from "../components/UI/Button";
 import { Card } from "../components/UI/Card";
+import { DebugPanel } from "../components/debug/DebugPanelComponent";
 import { formatDuration, getTrimmedId } from "../utils";
 
 export const Operations: React.FC = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const cursor = searchParams.get('cursor') || undefined;
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const { items: blocks, loading, error, hasMore, nextCursor } = useBlocks(cursor);
 
@@ -17,6 +19,7 @@ export const Operations: React.FC = () => {
         // Simple navigation - browser will remember this in history
         navigate(`/logs/${block.id}`);
     };
+
     const handleNext = () => {
         if (nextCursor) {
             navigate(`/operations?cursor=${encodeURIComponent(nextCursor)}`);
@@ -31,10 +34,22 @@ export const Operations: React.FC = () => {
         navigate('/');
     };
 
+    const handleDataPurged = () => {
+        // Force a refresh of the blocks data after purge
+        setRefreshKey(prev => prev + 1);
+        // Optionally navigate back to first page
+        navigate('/operations');
+    };
+
     const canGoBack = cursor && window.history.length > 1;
 
+    // Add refreshKey to dependency to force re-fetch after purge
+    useEffect(() => {
+        // This effect will run when refreshKey changes, causing useBlocks to re-fetch
+    }, [refreshKey]);
+
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 relative">
             {/* Header */}
             <div className="bg-white border-b border-gray-200">
                 <div className="max-w-6xl mx-auto px-6 py-4">
@@ -68,7 +83,7 @@ export const Operations: React.FC = () => {
                 ) : blocks.length === 0 && loading ? (
                     <div className="text-center py-20">
                         <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-xl mx-auto mb-4 animate-pulse">
-                            🔄
+                            📄
                         </div>
                         <div className="text-lg font-medium text-gray-700 mb-2">Loading operations...</div>
                         <div className="text-sm text-gray-500">Fetching execution blocks</div>
@@ -125,6 +140,9 @@ export const Operations: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {/* Debug Panel - Only appears in development */}
+            <DebugPanel onDataPurged={handleDataPurged} />
         </div>
     );
 };

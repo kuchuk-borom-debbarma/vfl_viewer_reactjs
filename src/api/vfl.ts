@@ -14,11 +14,11 @@ const debugLog = (type: 'REQUEST' | 'RESPONSE' | 'ERROR', endpoint: string, data
     if (data) console.log('Data:', data);
 };
 
-const apiFetch = async <T>(endpoint: string): Promise<T> => {
+const apiFetch = async <T>(endpoint: string, options?: RequestInit): Promise<T> => {
     debugLog('REQUEST', endpoint);
 
     try {
-        const res = await fetch(getApiUrl(endpoint));
+        const res = await fetch(getApiUrl(endpoint), options);
 
         if (!res.ok) {
             const errorText = await res.text();
@@ -106,4 +106,14 @@ export const getLogsByBlockId = async (
         logs,
         nextCursor: logs.length >= limit ? nextCursor : null
     };
+};
+
+// Debug/Development only function
+export const purgeData = async (): Promise<void> => {
+    await apiFetch('/purge', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 };
