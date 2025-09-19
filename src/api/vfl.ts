@@ -30,10 +30,37 @@ const apiFetch = async <T>(endpoint: string, options?: RequestInit): Promise<T> 
             throw new Error(`API error: ${res.statusText} - ${errorText}`);
         }
 
-        const data = await res.json();
+        // Check if response has content
+        const contentLength = res.headers.get('content-length');
+        const contentType = res.headers.get('content-type');
+
+        // If no content or content length is 0, return null/undefined
+        if (contentLength === '0' || !contentType?.includes('application/json')) {
+            debugLog('RESPONSE', endpoint, 'No JSON content');
+            return undefined as T;
+        }
+
+        // Try to get response text first
+        const responseText = await res.text();
+
+        // If empty response, return undefined
+        if (!responseText.trim()) {
+            debugLog('RESPONSE', endpoint, 'Empty response');
+            return undefined as T;
+        }
+
+        // Parse JSON
+        const data = JSON.parse(responseText);
         debugLog('RESPONSE', endpoint, data);
         return data;
+
     } catch (err: any) {
+        // If it's a JSON parsing error but response was successful, it might be an empty response
+        if (err.name === 'SyntaxError' && err.message.includes('JSON')) {
+            debugLog('RESPONSE', endpoint, 'Non-JSON response (likely empty)');
+            return undefined as T;
+        }
+
         debugLog('ERROR', endpoint, err.message);
         throw err;
     }
@@ -106,6 +133,17 @@ export const getLogsByBlockId = async (
         logs,
         nextCursor: logs.length >= limit ? nextCursor : null
     };
+};
+
+// Delete blocks by IDs
+export const deleteBlocksById = async (blockIds: string[]): Promise<void> => {
+    const idsParam = blockIds.join(',');
+    await apiFetch(`/blocks/${idsParam}`, {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    });
 };
 
 // Debug/Development only function

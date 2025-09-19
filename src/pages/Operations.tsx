@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Block } from "../types";
 import { useBlocks } from "../hooks/useBlocks";
+import { deleteBlocksById } from "../api/vfl";
 import { Button } from "../components/UI/Button";
 import { Card } from "../components/UI/Card";
 import { DebugPanel } from "../components/debug/DebugPanelComponent";
@@ -12,11 +13,11 @@ export const Operations: React.FC = () => {
     const [searchParams] = useSearchParams();
     const cursor = searchParams.get('cursor') || undefined;
     const [refreshKey, setRefreshKey] = useState(0);
+    const [deletingBlocks, setDeletingBlocks] = useState<Set<string>>(new Set());
 
     const { items: blocks, loading, error, hasMore, nextCursor } = useBlocks(cursor);
 
     const handleNavigateToBlock = (block: Block) => {
-        // Simple navigation - browser will remember this in history
         navigate(`/logs/${block.id}`);
     };
 
@@ -34,16 +35,38 @@ export const Operations: React.FC = () => {
         navigate('/');
     };
 
+    const handleDeleteBlock = async (blockId: string, event: React.MouseEvent) => {
+        event.stopPropagation(); // Prevent navigation when clicking delete
+
+        if (!confirm("Are you sure you want to delete this operation? This action cannot be undone.")) {
+            return;
+        }
+
+        setDeletingBlocks(prev => new Set([...prev, blockId]));
+
+        try {
+            await deleteBlocksById([blockId]);
+            // Force refresh by incrementing refresh key
+            setRefreshKey(prev => prev + 1);
+        } catch (error: any) {
+            console.error('Failed to delete block:', error);
+            alert(`Failed to delete operation: ${error.message}`);
+        } finally {
+            setDeletingBlocks(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(blockId);
+                return newSet;
+            });
+        }
+    };
+
     const handleDataPurged = () => {
-        // Force a refresh of the blocks data after purge
         setRefreshKey(prev => prev + 1);
-        // Optionally navigate back to first page
         navigate('/operations');
     };
 
     const canGoBack = cursor && window.history.length > 1;
 
-    // Add refreshKey to dependency to force re-fetch after purge
     useEffect(() => {
         // This effect will run when refreshKey changes, causing useBlocks to re-fetch
     }, [refreshKey]);
@@ -101,9 +124,11 @@ export const Operations: React.FC = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {blocks.map(block => (
                                 <BlockCard
-                                    key={block.id}
+                                    key={`${refreshKey}-${block.id}`} // Include refreshKey to force re-render after delete
                                     block={block}
+                                    isDeleting={deletingBlocks.has(block.id)}
                                     onClick={() => handleNavigateToBlock(block)}
+                                    onDelete={(e) => handleDeleteBlock(block.id, e)}
                                 />
                             ))}
                         </div>
@@ -147,20 +172,32 @@ export const Operations: React.FC = () => {
     );
 };
 
-const BlockCard: React.FC<{ block: Block; onClick: () => void }> = ({
-                                                                        block,
-                                                                        onClick
-                                                                    }) => {
+const BlockCard: React.FC<{
+    block: Block;
+    isDeleting: boolean;
+    onClick: () => void;
+    onDelete: (e: React.MouseEvent) => void;
+}> = ({ block, isDeleting, onClick, onDelete }) => {
     const isOngoing = !block.endTime;
 
     return (
         <Card
             interactive
             onClick={onClick}
-            className="hover:shadow-md hover:border-gray-300 transition-all duration-200 h-full"
+            className="hover:shadow-md hover:border-gray-300 transition-all duration-200 h-full relative group"
         >
+            {/* Delete Button - appears on hover */}
+            <button
+                onClick={onDelete}
+                disabled={isDeleting}
+                className="absolute top-3 right-3 w-8 h-8 bg-red-50 border border-red-200 text-red-600 rounded-lg hover:bg-red-100 hover:border-red-300 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center text-sm disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                title="Delete operation"
+            >
+                {isDeleting ? '⋯' : '×'}
+            </button>
+
             {/* Header */}
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-4 pr-10">
                 <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-800 truncate mb-1">
                         {block.name}
@@ -169,7 +206,7 @@ const BlockCard: React.FC<{ block: Block; onClick: () => void }> = ({
                         {getTrimmedId(block.id)}
                     </div>
                 </div>
-                <div className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ml-3 ${
+                <div className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
                     isOngoing
                         ? 'bg-amber-100 text-amber-700 border border-amber-200'
                         : 'bg-green-100 text-green-700 border border-green-200'
@@ -233,6 +270,16 @@ const BlockCard: React.FC<{ block: Block; onClick: () => void }> = ({
                     →
                 </div>
             </div>
+
+            {/* Deleting overlay */}
+            {isDeleting && (
+                <div className="absolute inset-0 bg-white bg-opacity-75 rounded-lg flex items-center justify-center">
+                    <div className="text-center">
+                        <div className="text-lg mb-2">⋯</div>
+                        <div className="text-sm text-gray-600">Deleting...</div>
+                    </div>
+                </div>
+            )}
         </Card>
     );
 };
