@@ -36,7 +36,7 @@ export const Operations: React.FC = () => {
     };
 
     const handleDeleteBlock = async (blockId: string, event: React.MouseEvent) => {
-        event.stopPropagation(); // Prevent navigation when clicking delete
+        event.stopPropagation();
 
         if (!confirm("Are you sure you want to delete this operation? This action cannot be undone.")) {
             return;
@@ -46,7 +46,6 @@ export const Operations: React.FC = () => {
 
         try {
             await deleteBlocksById([blockId]);
-            // Force refresh by incrementing refresh key
             setRefreshKey(prev => prev + 1);
         } catch (error: any) {
             console.error('Failed to delete block:', error);
@@ -106,7 +105,7 @@ export const Operations: React.FC = () => {
                 ) : blocks.length === 0 && loading ? (
                     <div className="text-center py-20">
                         <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-lg flex items-center justify-center text-xl mx-auto mb-4 animate-pulse">
-                            📄
+                            🔄
                         </div>
                         <div className="text-lg font-medium text-gray-700 mb-2">Loading operations...</div>
                         <div className="text-sm text-gray-500">Fetching execution blocks</div>
@@ -123,8 +122,8 @@ export const Operations: React.FC = () => {
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {blocks.map(block => (
-                                <BlockCard
-                                    key={`${refreshKey}-${block.id}`} // Include refreshKey to force re-render after delete
+                                <DetailedBlockCard
+                                    key={`${refreshKey}-${block.id}`}
                                     block={block}
                                     isDeleting={deletingBlocks.has(block.id)}
                                     onClick={() => handleNavigateToBlock(block)}
@@ -172,13 +171,22 @@ export const Operations: React.FC = () => {
     );
 };
 
-const BlockCard: React.FC<{
+const DetailedBlockCard: React.FC<{
     block: Block;
     isDeleting: boolean;
     onClick: () => void;
     onDelete: (e: React.MouseEvent) => void;
 }> = ({ block, isDeleting, onClick, onDelete }) => {
-    const isOngoing = !block.endTime;
+    const isOngoing = !block.exitedAt;
+
+    const getLifecycleStage = () => {
+        if (!block.enteredAt) return { stage: 'Created', color: 'bg-blue-100 text-blue-700 border-blue-200' };
+        if (!block.exitedAt) return { stage: 'Executing', color: 'bg-amber-100 text-amber-700 border-amber-200' };
+        if (!block.returnedAt) return { stage: 'Finished', color: 'bg-purple-100 text-purple-700 border-purple-200' };
+        return { stage: 'Returned', color: 'bg-green-100 text-green-700 border-green-200' };
+    };
+
+    const lifecycle = getLifecycleStage();
 
     return (
         <Card
@@ -206,56 +214,104 @@ const BlockCard: React.FC<{
                         {getTrimmedId(block.id)}
                     </div>
                 </div>
-                <div className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
-                    isOngoing
-                        ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                        : 'bg-green-100 text-green-700 border border-green-200'
-                }`}>
-                    {isOngoing ? 'Running' : 'Complete'}
+                <div className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap border ${lifecycle.color}`}>
+                    {lifecycle.stage}
                 </div>
             </div>
 
-            {/* Details Grid */}
-            <div className="space-y-3 text-sm">
+            {/* Lifecycle Timeline */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <div className="text-xs font-semibold text-gray-700 mb-2">Block Lifecycle</div>
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                            <span className="text-gray-600">Created</span>
+                        </div>
+                        <span className="text-gray-800 font-mono">
+                            {new Date(block.createdAt).toLocaleTimeString()}
+                        </span>
+                    </div>
+
+                    {block.enteredAt && (
+                        <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                <span className="text-gray-600">Entered</span>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-gray-800 font-mono">
+                                    {new Date(block.enteredAt).toLocaleTimeString()}
+                                </div>
+                                <div className="text-gray-500 text-xs">
+                                    +{formatDuration(block.createdAt, block.enteredAt)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {block.exitedAt && (
+                        <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                                <span className="text-gray-600">Exited</span>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-gray-800 font-mono">
+                                    {new Date(block.exitedAt).toLocaleTimeString()}
+                                </div>
+                                <div className="text-gray-500 text-xs">
+                                    +{formatDuration(block.enteredAt || block.createdAt, block.exitedAt)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {block.returnedAt && (
+                        <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
+                                <span className="text-gray-600">Returned</span>
+                            </div>
+                            <div className="text-right">
+                                <div className="text-gray-800 font-mono">
+                                    {new Date(block.returnedAt).toLocaleTimeString()}
+                                </div>
+                                <div className="text-gray-500 text-xs">
+                                    +{formatDuration(block.exitedAt || block.enteredAt || block.createdAt, block.returnedAt)}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Total Duration */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex justify-between items-center">
-                    <span className="text-gray-500 font-medium">Started</span>
-                    <span className="text-gray-800 text-xs">
-                        {new Date(block.startTime).toLocaleString()}
+                    <span className="text-sm font-medium text-blue-700">Total Duration</span>
+                    <span className="text-blue-800 font-mono text-sm font-semibold">
+                        {formatDuration(block.createdAt, block.returnedAt || block.exitedAt || Date.now())}
                     </span>
                 </div>
-
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-500 font-medium">Duration</span>
-                    <span className="text-gray-800 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                        {formatDuration(block.startTime, block.endTime)}
-                    </span>
-                </div>
-
-                {block.endTime && (
-                    <div className="flex justify-between items-center">
-                        <span className="text-gray-500 font-medium">Ended</span>
-                        <span className="text-gray-800 text-xs">
-                            {new Date(block.endTime).toLocaleString()}
+                {block.enteredAt && block.exitedAt && (
+                    <div className="flex justify-between items-center mt-1 pt-1 border-t border-blue-150">
+                        <span className="text-xs text-blue-600">Execution Time</span>
+                        <span className="text-blue-700 font-mono text-xs">
+                            {formatDuration(block.enteredAt, block.exitedAt)}
                         </span>
                     </div>
                 )}
-
-                <div className="flex justify-between items-center">
-                    <span className="text-gray-500 font-medium">Created</span>
-                    <span className="text-gray-800 text-xs">
-                        {new Date(block.createdAt).toLocaleString()}
-                    </span>
-                </div>
             </div>
 
             {/* End Message */}
-            {block.endMessage && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="text-xs font-medium text-blue-700 mb-1">End Message</div>
-                    <div className="text-xs text-blue-800 leading-relaxed">
-                        {block.endMessage.length > 100
-                            ? `${block.endMessage.slice(0, 100)}...`
-                            : block.endMessage
+            {block.exitMessage && (
+                <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="text-xs font-medium text-gray-700 mb-1">Exit Message</div>
+                    <div className="text-xs text-gray-600 leading-relaxed">
+                        {block.exitMessage.length > 120
+                            ? `${block.exitMessage.slice(0, 120)}...`
+                            : block.exitMessage
                         }
                     </div>
                 </div>
